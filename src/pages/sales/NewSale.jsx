@@ -1,300 +1,50 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  ArrowLeft,
-  ShoppingCart,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  DollarSign,
-  Package,
-  Layers
-} from 'lucide-react'
+import { Check, ChevronDown, CreditCard, Minus, PackageCheck, Plus, QrCode, Search, ShoppingBag, Smartphone, Trash2, UserRound } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { MobileHeader, MobilePage } from '@/components/mobile/MobileUI'
+
+const channels = ['WhatsApp', 'Instagram', 'Indicação', 'Visita', 'Loja Física']
+const payments = ['Pix', 'Cartão', 'Dinheiro']
 
 export function NewSale() {
   const navigate = useNavigate()
   const { clients, products, addSale } = useApp()
-
-  const [clientId, setClientId] = useState('')
+  const [clientId, setClientId] = useState(clients[0]?.id || '')
   const [channel, setChannel] = useState('WhatsApp')
-  const [location, setLocation] = useState('Loja Vila Velha')
-  const [paymentMethod, setPaymentMethod] = useState('Pix')
+  const [payment, setPayment] = useState('Pix')
+  const [paid, setPaid] = useState(true)
+  const [reserve, setReserve] = useState(true)
   const [discount, setDiscount] = useState(0)
-
-  // Items in sale
-  const [items, setItems] = useState([
-    { productId: products[0]?.id || '', quantity: 1, unitPrice: products[0]?.sale_price || 89.90 }
-  ])
-
-  const handleAddItem = () => {
-    setItems([
-      ...items,
-      { productId: products[0]?.id || '', quantity: 1, unitPrice: products[0]?.sale_price || 89.90 }
-    ])
-  }
-
-  const handleRemoveItem = (index) => {
-    setItems(items.filter((_, i) => i !== index))
-  }
-
-  const handleProductChange = (index, prodId) => {
-    const prod = products.find(p => p.id === prodId)
-    const newItems = [...items]
-    newItems[index] = {
-      ...newItems[index],
-      productId: prodId,
-      unitPrice: prod ? prod.sale_price : 0
-    }
-    setItems(newItems)
-  }
-
-  const handleQuantityChange = (index, qty) => {
-    const newItems = [...items]
-    newItems[index].quantity = Math.max(1, parseInt(qty) || 1)
-    setItems(newItems)
-  }
-
-  const subtotal = items.reduce((acc, curr) => acc + (curr.unitPrice * curr.quantity), 0)
-  const total = Math.max(0, subtotal - parseFloat(discount || 0))
-  const estimatedCost = items.reduce((acc, curr) => {
-    const prod = products.find(p => p.id === curr.productId)
-    return acc + ((prod?.cost_price || 15) * curr.quantity)
-  }, 0)
-  const estimatedProfit = total - estimatedCost
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    const selectedClient = clients.find(c => c.id === clientId)
-    const clientName = selectedClient ? selectedClient.name : 'Cliente Avulso'
-
-    addSale({
-      client_id: clientId,
-      client_name: clientName,
-      channel,
-      location,
-      payment_method: paymentMethod,
-      items_count: items.reduce((acc, curr) => acc + curr.quantity, 0),
-      subtotal,
-      discount: parseFloat(discount || 0),
-      total,
-      cost: estimatedCost,
-      profit: estimatedProfit,
-      plates_assigned: []
-    })
-
-    navigate('/app/sales')
+  const [items, setItems] = useState(products.slice(0, 2).map((product) => ({ ...product, quantity: 1 })))
+  const [saved, setSaved] = useState(false)
+  const client = clients.find((item) => item.id === clientId)
+  const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.sale_price * item.quantity, 0), [items])
+  const total = Math.max(0, subtotal - Number(discount || 0))
+  const money = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const updateQuantity = (id, amount) => setItems((current) => current.map((item) => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + amount) } : item))
+  const addProduct = () => { const next = products.find((product) => !items.some((item) => item.id === product.id)); if (next) setItems((current) => [...current, { ...next, quantity: 1 }]) }
+  const submit = () => {
+    if (!client || !items.length) return
+    addSale({ client_id: client.id, client_name: client.name, channel, location: 'Loja Vila Velha', items_count: items.reduce((sum, item) => sum + item.quantity, 0), product_name: items[0].name, subtotal, discount: Number(discount || 0), total, cost: items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), profit: total - items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), payment_method: payment, payment_status: paid ? 'paid' : 'pending', reserve_hardware: reserve })
+    setSaved(true)
+    setTimeout(() => navigate('/app'), 900)
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Top Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/app/sales')}
-          className="p-2 rounded-xl bg-white border border-cardBorder text-subText hover:text-mainText hover:bg-gray-50 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold font-heading text-mainText">Registrar Nova Venda</h1>
-          <p className="text-xs text-subText">Lançamento de pedido, movimentação de estoque e faturamento.</p>
-        </div>
-      </div>
+    <MobilePage className="pb-36">
+      <MobileHeader title="Nova venda" subtitle="Etapa 1 de 3" back compact />
+      <div className="mb-5 flex gap-2"><span className="h-1.5 flex-1 rounded-full bg-blue-600" /><span className="h-1.5 flex-1 rounded-full bg-blue-100" /><span className="h-1.5 flex-1 rounded-full bg-blue-100" /></div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Step 1: Cliente e Canal */}
-        <div className="bg-white rounded-card border border-cardBorder p-6 shadow-card space-y-4">
-          <h2 className="text-sm font-bold text-mainText pb-2 border-b border-divider">
-            1. Dados do Cliente e Canal de Venda
-          </h2>
+      <section className="mobile-card mb-4 p-4"><div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-blue-50 text-blue-600"><UserRound size={17} /></span><h2 className="text-sm font-extrabold">Cliente & canal</h2></div><label className="text-[10px] font-bold uppercase text-slate-400">Cliente</label><div className="relative mt-1"><Search className="absolute left-3 top-3 text-slate-400" size={16} /><select value={clientId} onChange={(event) => setClientId(event.target.value)} className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-10 text-xs font-bold outline-none focus:border-blue-500">{clients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown className="absolute right-3 top-3 text-slate-400" size={16} /></div><p className="mb-2 mt-4 text-[10px] font-bold uppercase text-slate-400">Canal de captura</p><div className="flex gap-2 overflow-x-auto pb-1">{channels.map((item) => <button key={item} type="button" onClick={() => setChannel(item)} className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-extrabold ${channel === item ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{item}</button>)}</div></section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-mainText mb-1.5">Cliente Destino *</label>
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                required
-                className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none"
-              >
-                <option value="">Selecione o cliente...</option>
-                {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+      <section className="mobile-card mb-4 p-4"><div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><ShoppingBag size={17} /></span><h2 className="text-sm font-extrabold">Itens da venda</h2></div><span className="text-[10px] font-bold text-slate-400">{items.length} produtos</span></div><div className="space-y-3">{items.map((item) => <div key={item.id} className="rounded-2xl bg-slate-50 p-3"><div className="flex gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white text-blue-600 ring-1 ring-slate-100"><QrCode size={22} /></span><div className="min-w-0 flex-1"><strong className="block truncate text-xs">{item.name}</strong><p className="mt-1 text-[10px] text-slate-400">{item.sku}</p><div className="mt-2 flex items-center justify-between"><strong className="text-xs text-blue-600">{money(item.sale_price)}</strong><div className="flex items-center gap-2"><button type="button" onClick={() => updateQuantity(item.id, -1)} className="grid h-7 w-7 place-items-center rounded-lg bg-white ring-1 ring-slate-200"><Minus size={13} /></button><span className="w-4 text-center text-xs font-extrabold">{item.quantity}</span><button type="button" onClick={() => updateQuantity(item.id, 1)} className="grid h-7 w-7 place-items-center rounded-lg bg-blue-600 text-white"><Plus size={13} /></button><button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} className="ml-1 text-rose-400"><Trash2 size={15} /></button></div></div></div></div></div>)}</div><button type="button" onClick={addProduct} disabled={items.length === products.length} className="mt-3 flex w-full items-center justify-center gap-1 rounded-2xl border border-dashed border-blue-200 py-3 text-[10px] font-extrabold text-blue-600 disabled:opacity-40"><Plus size={14} /> Adicionar produto</button></section>
 
-            <div>
-              <label className="block text-xs font-semibold text-mainText mb-1.5">Canal da Venda</label>
-              <select
-                value={channel}
-                onChange={(e) => setChannel(e.target.value)}
-                className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none"
-              >
-                <option value="WhatsApp">WhatsApp</option>
-                <option value="Instagram">Instagram</option>
-                <option value="Indicação">Indicação</option>
-                <option value="Loja Física">Loja Física</option>
-                <option value="Visita Comercial">Visita Comercial</option>
-                <option value="Site / E-commerce">Site / E-commerce</option>
-              </select>
-            </div>
+      <section className="mobile-card mb-4 p-4"><div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><CreditCard size={17} /></span><h2 className="text-sm font-extrabold">Pagamento & condições</h2></div><div className="grid grid-cols-3 gap-2">{payments.map((item) => <button key={item} type="button" onClick={() => setPayment(item)} className={`rounded-xl py-3 text-[10px] font-extrabold ${payment === item ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>{item}</button>)}</div><div className="mt-4 grid grid-cols-2 gap-3"><label><span className="text-[10px] font-bold text-slate-400">Desconto (R$)</span><input type="number" min="0" value={discount} onChange={(event) => setDiscount(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-bold outline-none" /></label><div><span className="text-[10px] font-bold text-slate-400">Recebimento</span><button type="button" onClick={() => setPaid((value) => !value)} className={`mt-1 flex w-full items-center justify-center gap-1 rounded-xl p-3 text-xs font-bold ${paid ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}><Check size={14} />{paid ? 'Pago' : 'Pendente'}</button></div></div></section>
 
-            <div>
-              <label className="block text-xs font-semibold text-mainText mb-1.5">Local da Operação</label>
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none"
-              >
-                <option value="Loja Vila Velha">Loja Vila Velha - ES</option>
-                <option value="Visita Comercial">Visita Comercial</option>
-                <option value="Feira / Evento">Feira / Evento</option>
-              </select>
-            </div>
-          </div>
-        </div>
+      <section className="mobile-card p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-50 text-blue-600"><PackageCheck size={20} /></span><div><strong className="block text-xs">Reserva de hardware NFC</strong><p className="text-[10px] text-slate-400">Separar placas após confirmar</p></div></div><button type="button" onClick={() => setReserve((value) => !value)} className={`relative h-7 w-12 rounded-full transition ${reserve ? 'bg-blue-600' : 'bg-slate-200'}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${reserve ? 'left-6' : 'left-1'}`} /></button></div>{reserve && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-blue-50 p-3 text-[10px] font-semibold text-blue-700"><Smartphone size={15} /> O estoque será reservado automaticamente.</div>}</section>
 
-        {/* Step 2: Itens do Pedido */}
-        <div className="bg-white rounded-card border border-cardBorder p-6 shadow-card space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-divider">
-            <h2 className="text-sm font-bold text-mainText">2. Itens e Produtos</h2>
-            <Button type="button" variant="outline" size="sm" onClick={handleAddItem} className="gap-1">
-              <Plus className="w-3.5 h-3.5" /> Adicionar Produto
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {items.map((item, index) => (
-              <div key={index} className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-[#F8FAFC] rounded-xl border border-cardBorder">
-                <div className="flex-1 w-full">
-                  <label className="block text-[11px] font-semibold text-subText mb-1">Produto</label>
-                  <select
-                    value={item.productId}
-                    onChange={(e) => handleProductChange(index, e.target.value)}
-                    className="w-full rounded-lg border border-divider bg-white px-3 py-2 text-xs text-mainText focus:border-primary focus:outline-none"
-                  >
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (R$ {p.sale_price.toFixed(2)}) - Estoque: {p.current_stock} un.
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-24">
-                  <label className="block text-[11px] font-semibold text-subText mb-1">Qtd</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => handleQuantityChange(index, e.target.value)}
-                    className="w-full rounded-lg border border-divider bg-white px-3 py-2 text-xs text-mainText focus:border-primary focus:outline-none"
-                  />
-                </div>
-
-                <div className="w-full sm:w-32">
-                  <label className="block text-[11px] font-semibold text-subText mb-1">Preço Unitário</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={item.unitPrice}
-                    readOnly
-                    className="w-full rounded-lg border border-divider bg-gray-50 px-3 py-2 text-xs text-subText font-mono"
-                  />
-                </div>
-
-                <div className="w-full sm:w-32 text-right">
-                  <label className="block text-[11px] font-semibold text-subText mb-1">Subtotal</label>
-                  <p className="text-xs font-bold font-heading text-mainText py-2">
-                    R$ {(item.unitPrice * item.quantity).toFixed(2)}
-                  </p>
-                </div>
-
-                {items.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(index)}
-                    className="text-subText hover:text-danger p-2 transition-colors self-end sm:self-center"
-                    title="Remover item"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Step 3: Pagamento e Total */}
-        <div className="bg-white rounded-card border border-cardBorder p-6 shadow-card space-y-4">
-          <h2 className="text-sm font-bold text-mainText pb-2 border-b border-divider">
-            3. Pagamento e Fechamento
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-mainText mb-1.5">Forma de Pagamento</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none"
-                >
-                  <option value="Pix">Pix (Instantâneo)</option>
-                  <option value="Cartão de Crédito">Cartão de Crédito</option>
-                  <option value="Boleto Bancário">Boleto Bancário</option>
-                  <option value="Dinheiro">Dinheiro</option>
-                </select>
-              </div>
-
-              <div>
-                <Input
-                  label="Desconto Concedido (R$)"
-                  type="number"
-                  step="0.01"
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            {/* Summary Box */}
-            <div className="bg-[#F8FAFC] rounded-2xl p-5 border border-cardBorder flex flex-col justify-between">
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between text-subText">
-                  <span>Subtotal bruto:</span>
-                  <span className="font-mono">R$ {subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-subText">
-                  <span>Desconto:</span>
-                  <span className="font-mono text-danger">- R$ {parseFloat(discount || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-subText">
-                  <span>Custo de mercadoria estimado:</span>
-                  <span className="font-mono">R$ {estimatedCost.toFixed(2)}</span>
-                </div>
-                <div className="pt-2 border-t border-divider flex justify-between font-bold text-base text-mainText">
-                  <span>Total a pagar:</span>
-                  <span className="font-heading text-primary">R$ {total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
-                  <span>Lucro líquido estimado:</span>
-                  <span>R$ {estimatedProfit.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <Button type="submit" variant="primary" size="lg" className="w-full mt-4">
-                Confirmar Venda e Baixar Estoque
-              </Button>
-            </div>
-          </div>
-        </div>
-      </form>
-    </div>
+      <div className="fixed inset-x-0 bottom-[74px] z-30 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur"><div className="mx-auto flex max-w-[440px] items-center gap-4"><div className="flex-1"><span className="text-[9px] font-bold uppercase text-slate-400">Total da venda</span><strong className="block text-lg text-slate-900">{money(total)}</strong></div><button type="button" onClick={submit} disabled={!items.length || saved} className="rounded-2xl bg-blue-600 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-blue-200 disabled:opacity-60">{saved ? 'Venda registrada!' : 'Confirmar venda'}</button></div></div>
+    </MobilePage>
   )
 }

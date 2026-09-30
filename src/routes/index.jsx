@@ -17,6 +17,7 @@ import { Reports } from '@/pages/reports/Reports'
 import { Team } from '@/pages/team/Team'
 import { Billing } from '@/pages/billing/Billing'
 import { Settings } from '@/pages/settings/Settings'
+import { Finance } from '@/pages/finance/Finance'
 import { useAuth } from '@/contexts/AuthContext'
 
 function ProtectedRoute({ children }) {
@@ -56,6 +57,7 @@ export function AppRoutes() {
         <Route path="sales/new" element={<NewSale />} />
         <Route path="products" element={<Products />} />
         <Route path="inventory" element={<Inventory />} />
+        <Route path="finance" element={<Finance />} />
         <Route path="credentials" element={<Credentials />} />
         <Route path="reports" element={<Reports />} />
         <Route path="team" element={<Team />} />

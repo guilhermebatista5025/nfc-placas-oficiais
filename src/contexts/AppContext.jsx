@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import {
   initialOrganization,
   initialClients,
@@ -10,16 +10,31 @@ import {
 } from '@/data/mockData'
 
 const AppContext = createContext(null)
+const PRODUCTS_STORAGE_KEY = 'craft-nfc-products'
+
+function loadStoredProducts() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PRODUCTS_STORAGE_KEY))
+    if (!Array.isArray(stored)) return initialProducts
+    return initialProducts.map(product => ({ ...product, ...(stored.find(item => item.id === product.id) || {}) }))
+  } catch {
+    return initialProducts
+  }
+}
 
 export function AppProvider({ children }) {
   const [organization, setOrganization] = useState(initialOrganization)
   const [clients, setClients] = useState(initialClients)
-  const [products, setProducts] = useState(initialProducts)
+  const [products, setProducts] = useState(loadStoredProducts)
   const [plates, setPlates] = useState(initialPlates)
   const [sales, setSales] = useState(initialSales)
   const [inventoryMovements, setInventoryMovements] = useState(initialInventoryMovements)
   const [credentials, setCredentials] = useState(initialCredentials)
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products))
+  }, [products])
 
   // Client operations
   const addClient = (newClient) => {
@@ -51,6 +66,46 @@ export function AppProvider({ children }) {
     return plate
   }
 
+  const addPlateBatch = ({ product, quantity, serialPrefix, destinationUrl = '', costPrice, salePrice, minimumStock }) => {
+    const batchId = Date.now()
+    const start = plates.length + 1
+    const newPlates = Array.from({ length: quantity }, (_, index) => {
+      const code = `NFC-${String(start + index).padStart(6, '0')}`
+      return {
+        id: `plt-${batchId}-${index}`,
+        code,
+        serial_number: `${serialPrefix || 'SN-NFC'}-${String(start + index).padStart(5, '0')}`,
+        product_id: product.id,
+        product_name: product.name,
+        client_name: null,
+        client_id: null,
+        status: 'in_stock',
+        google_review_url: destinationUrl,
+        qr_code_url: `https://craftnfc.com/r/${code}`,
+        activated_at: null
+      }
+    })
+    setPlates(prev => [...newPlates, ...prev])
+    setProducts(prev => prev.map(item => item.id === product.id ? {
+      ...item,
+      current_stock: Number(item.current_stock || 0) + quantity,
+      cost_price: Number(costPrice ?? item.cost_price),
+      sale_price: Number(salePrice ?? item.sale_price),
+      minimum_stock: Number(minimumStock ?? item.minimum_stock)
+    } : item))
+    return newPlates
+  }
+
+  const updateProductPricing = (id, pricing) => {
+    setProducts(prev => prev.map(item => item.id === id ? {
+      ...item,
+      cost_price: Number(pricing.cost_price),
+      sale_price: Number(pricing.sale_price),
+      minimum_stock: Number(pricing.minimum_stock),
+      pricing_configured: true
+    } : item))
+  }
+
   const updatePlate = (id, updatedData) => {
     setPlates(prev => prev.map(p => {
       if (p.id === id) {
@@ -72,8 +127,8 @@ export function AppProvider({ children }) {
       id: 'sl-' + Date.now(),
       number: String(sales.length + 54).padStart(5, '0'),
       sale_date: new Date().toISOString().split('T')[0],
-      status: 'completed',
-      payment_status: 'paid'
+      status: saleData.status || 'completed',
+      payment_status: saleData.payment_status || 'paid'
     }
     setSales(prev => [sale, ...prev])
 
@@ -112,8 +167,10 @@ export function AppProvider({ children }) {
         addClient,
         updateClient,
         products,
+        updateProductPricing,
         plates,
         addPlate,
+        addPlateBatch,
         updatePlate,
         sales,
         addSale,

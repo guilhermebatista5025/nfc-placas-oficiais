@@ -70,11 +70,11 @@ export const initialProducts = [
   },
   {
     id: 'prod-02',
-    name: 'Display de Balcão NFC',
-    sku: 'NFC-DSP-BLC',
-    description: 'Totem expositor elegante em L com tecnologia NFC e QR Code de alta densidade.',
-    cost_price: 25.00,
-    sale_price: 129.90,
+    name: 'Placa NFC Acrílico Instagram',
+    sku: 'NFC-PL-INS',
+    description: 'Placa acrílica com chip NFC e QR Code direcionados ao perfil do Instagram.',
+    cost_price: 18.50,
+    sale_price: 89.90,
     minimum_stock: 10,
     current_stock: 18,
     active: true

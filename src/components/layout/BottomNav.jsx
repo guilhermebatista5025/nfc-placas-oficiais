@@ -2,25 +2,24 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Home,
-  BarChart2,
   Plus,
   Cpu,
-  User,
-  Menu
+  Users,
+  Package
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function BottomNav({ onOpenMore }) {
+export function BottomNav() {
   const tabs = [
     { name: 'Início', path: '/app', icon: Home, exact: true },
-    { name: 'Métricas', path: '/app/reports', icon: BarChart2 },
-    { name: 'Vender', path: '/app/sales/new', icon: Plus, isAction: true },
     { name: 'Placas', path: '/app/plates', icon: Cpu },
-    { name: 'Perfil', path: '/app/settings', icon: User },
+    { name: 'Vender', path: '/app/sales/new', icon: Plus, isAction: true },
+    { name: 'Estoque', path: '/app/inventory', icon: Package },
+    { name: 'Clientes', path: '/app/clients', icon: Users },
   ]
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-cardBorder/80 px-3 py-2 safe-area-pb shadow-mobile">
+    <nav className="mobile-bottom-nav">
       <div className="flex items-center justify-around max-w-md mx-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon
@@ -32,7 +31,7 @@ export function BottomNav({ onOpenMore }) {
                 to={tab.path}
                 className="flex flex-col items-center justify-center -mt-6 transition-all duration-200 active:scale-95 group"
               >
-                <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-primary to-[#8174FF] text-white flex items-center justify-center shadow-glow ring-4 ring-white transition-all group-hover:shadow-lg">
+                <div className="flex h-13 w-13 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-[0_10px_25px_-5px_rgba(37,99,235,.5)] ring-4 ring-white transition-all">
                   <Icon className="w-6 h-6 stroke-[2.5]" />
                 </div>
               </NavLink>

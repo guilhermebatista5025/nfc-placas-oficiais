@@ -1,451 +1,86 @@
-import React, { useState } from 'react'
-import {
-  Cpu,
-  Plus,
-  QrCode,
-  ExternalLink,
-  Edit,
-  CheckCircle2,
-  AlertCircle,
-  Copy,
-  Check,
-  Search,
-  Filter
-} from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Bluetooth, Check, Copy, Filter, Link2, MapPin, Nfc, Pencil, Plus, QrCode, Save, ScanLine, Search, Settings2, UserRound, Wifi, X } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
-import { Badge, plateStatusConfig } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Modal } from '@/components/ui/Modal'
+import { EmptyMobile, MobileHeader, MobilePage, StatusPill } from '@/components/mobile/MobileUI'
+
+const filters = [{ key: 'all', label: 'Todas' }, { key: 'active', label: 'Ativas' }, { key: 'configuring', label: 'Configurando' }, { key: 'in_stock', label: 'Estoque' }]
+const statusMap = { active: ['Ativa', 'green'], configuring: ['Configurando', 'amber'], in_stock: ['Em estoque', 'blue'], sold: ['Vendida', 'slate'], reserved: ['Reservada', 'amber'], disabled: ['Desativada', 'rose'] }
 
 export function Plates() {
-  const { plates, clients, products, addPlate, updatePlate, searchQuery } = useApp()
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [selectedPlate, setSelectedPlate] = useState(null)
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
-  const [isNewPlateModalOpen, setIsNewPlateModalOpen] = useState(false)
-  const [copiedCode, setCopiedCode] = useState(null)
+  const navigate = useNavigate()
+  const { plates, clients, updatePlate } = useApp()
+  const [filter, setFilter] = useState('all')
+  const [query, setQuery] = useState('')
+  const [qrPlate, setQrPlate] = useState(null)
+  const [configuringPlate, setConfiguringPlate] = useState(null)
+  const [form, setForm] = useState({ code: '', serial_number: '', client_id: '', google_review_url: '', status: 'configuring' })
+  const [copied, setCopied] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const visible = useMemo(() => plates.filter((plate) => (filter === 'all' || plate.status === filter) && `${plate.code} ${plate.client_name || ''} ${plate.product_name}`.toLowerCase().includes(query.toLowerCase())), [plates, filter, query])
 
-  // Form states for configuration modal
-  const [editStatus, setEditStatus] = useState('')
-  const [editGoogleUrl, setEditGoogleUrl] = useState('')
-  const [editClientId, setEditClientId] = useState('')
-
-  // Form states for new plate modal
-  const [newCode, setNewCode] = useState('')
-  const [newSerial, setNewSerial] = useState('')
-  const [newProductId, setNewProductId] = useState('')
-
-  const handleOpenConfig = (plate) => {
-    setSelectedPlate(plate)
-    setEditStatus(plate.status)
-    setEditGoogleUrl(plate.google_review_url || '')
-    setEditClientId(plate.client_id || '')
-    setIsConfigModalOpen(true)
+  const openConfiguration = (plate) => {
+    setConfiguringPlate(plate)
+    setSaved(false)
+    setForm({ code: plate.code || '', serial_number: plate.serial_number || '', client_id: plate.client_id || '', google_review_url: plate.google_review_url || '', status: plate.status || 'configuring' })
   }
-
-  const handleSaveConfig = (e) => {
-    e.preventDefault()
-    if (!selectedPlate) return
-
-    const selectedClient = clients.find(c => c.id === editClientId)
-
-    updatePlate(selectedPlate.id, {
-      status: editStatus,
-      google_review_url: editGoogleUrl,
-      client_id: editClientId || null,
-      client_name: selectedClient ? selectedClient.name : null
-    })
-
-    setIsConfigModalOpen(false)
+  const saveConfiguration = (event) => {
+    event.preventDefault()
+    const client = clients.find((item) => item.id === form.client_id)
+    updatePlate(configuringPlate.id, { ...form, client_name: client?.name || null })
+    setSaved(true)
+    setTimeout(() => setConfiguringPlate(null), 650)
   }
-
-  const handleCreatePlate = (e) => {
-    e.preventDefault()
-    const product = products.find(p => p.id === newProductId) || products[0]
-
-    addPlate({
-      code: newCode || `NFC-${String(plates.length + 1).padStart(6, '0')}`,
-      serial_number: newSerial || `SN-NFC-${Math.floor(10000 + Math.random() * 90000)}`,
-      product_name: product?.name || 'Placa NFC Padrão',
-      status: 'in_stock',
-      google_review_url: '',
-      client_name: null,
-      client_id: null
-    })
-
-    setIsNewPlateModalOpen(false)
-    setNewCode('')
-    setNewSerial('')
+  const copyLink = async (plate) => {
+    await navigator.clipboard?.writeText(plate.qr_code_url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1200)
   }
-
-  const handleCopy = (text, id) => {
-    navigator.clipboard.writeText(text)
-    setCopiedCode(id)
-    setTimeout(() => setCopiedCode(null), 2000)
-  }
-
-  const filteredPlates = plates.filter(p => {
-    const matchesStatus = statusFilter === 'all' || p.status === statusFilter
-    const query = searchQuery.toLowerCase()
-    const matchesSearch =
-      !searchQuery ||
-      p.code.toLowerCase().includes(query) ||
-      (p.client_name && p.client_name.toLowerCase().includes(query)) ||
-      (p.product_name && p.product_name.toLowerCase().includes(query))
-    return matchesStatus && matchesSearch
-  })
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-heading text-mainText">Gerenciamento de Placas NFC</h1>
-          <p className="text-xs text-subText mt-1">
-            Controle de seriais, vínculo com avaliações Google Reviews e ativação em clientes.
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsNewPlateModalOpen(true)}
-          className="gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          Cadastrar Placa NFC
-        </Button>
-      </div>
+    <MobilePage>
+      <MobileHeader title="Gestão de placas" subtitle={`${plates.length} dispositivos`} actions={<button type="button" className="mobile-icon-button" aria-label="Filtros"><Filter size={19} /></button>} />
+      <div className="relative mt-2"><Search className="absolute left-4 top-3.5 text-slate-400" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar placa, cliente ou código" className="w-full rounded-2xl border border-slate-100 bg-white py-3.5 pl-11 pr-12 text-xs font-semibold shadow-sm outline-none focus:border-blue-400" /><button type="button" className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white"><ScanLine size={18} /></button></div>
+      <div className="my-4 flex gap-2 overflow-x-auto pb-1">{filters.map((item) => <button key={item.key} type="button" onClick={() => setFilter(item.key)} className={`shrink-0 rounded-full px-4 py-2.5 text-[10px] font-extrabold ${filter === item.key ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'bg-white text-slate-500 ring-1 ring-slate-100'}`}>{item.label}</button>)}</div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-divider">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`px-3 py-2 text-xs font-semibold rounded-xl transition-colors shrink-0 ${
-            statusFilter === 'all'
-              ? 'bg-primary text-white'
-              : 'text-subText hover:text-mainText hover:bg-gray-100'
-          }`}
-        >
-          Todas ({plates.length})
-        </button>
-        {Object.entries(plateStatusConfig).map(([statusKey, config]) => {
-          const count = plates.filter(p => p.status === statusKey).length
+      <section className="relative mb-5 overflow-hidden rounded-[26px] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900 p-5 text-white"><div className="absolute -right-6 -top-10 h-32 w-32 rounded-full bg-blue-500/30 blur-2xl" /><div className="relative flex items-center gap-4"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15"><Bluetooth size={26} /></span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong className="text-sm text-white">Leitor NFC conectado</strong><span className="h-2 w-2 rounded-full bg-emerald-400" /></div><p className="mt-1 text-[10px] text-blue-200">Craft Reader • pronto para gravar</p></div><Wifi size={18} className="text-emerald-300" /></div></section>
+
+      <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-extrabold">Suas placas</h2><span className="text-[10px] font-bold text-slate-400">{visible.length} resultados</span></div>
+      <div className="space-y-3">
+        {visible.length ? visible.map((plate) => {
+          const [label, tone] = statusMap[plate.status] || statusMap.in_stock
           return (
-            <button
-              key={statusKey}
-              onClick={() => setStatusFilter(statusKey)}
-              className={`px-3 py-2 text-xs font-medium rounded-xl transition-colors shrink-0 flex items-center gap-1.5 ${
-                statusFilter === statusKey
-                  ? 'bg-white border border-cardBorder text-mainText shadow-sm'
-                  : 'text-subText hover:text-mainText hover:bg-gray-100'
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${config.dotColor}`} />
-              {config.label} ({count})
-            </button>
+            <article key={plate.id} className="mobile-card overflow-hidden p-4">
+              <div className="flex items-start gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600"><Nfc size={23} /></span><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><strong className="block truncate text-xs text-slate-900">{plate.client_name || 'Placa sem cliente'}</strong><p className="mt-1 truncate text-[10px] text-slate-400">{plate.product_name}</p></div><StatusPill tone={tone}>{label}</StatusPill></div><p className="mt-2 font-mono text-[10px] font-bold text-slate-500">{plate.code} • {plate.serial_number}</p></div></div>
+              <div className={`mt-3 rounded-2xl p-3 ${plate.google_review_url ? 'bg-slate-50' : 'bg-amber-50'}`}><p className={`truncate text-[10px] font-semibold ${plate.google_review_url ? 'text-slate-500' : 'text-amber-700'}`}>{plate.google_review_url || 'Aguardando URL do Google Maps / Instagram'}</p></div>
+              <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setQrPlate(plate)} className="flex items-center justify-center gap-1 rounded-xl bg-blue-600 py-2.5 text-[10px] font-bold text-white"><QrCode size={14} /> Ver QR Code</button><button type="button" onClick={() => openConfiguration(plate)} className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 py-2.5 text-[10px] font-bold text-slate-600"><Settings2 size={14} /> Configurar</button></div>
+            </article>
           )
-        })}
+        }) : <EmptyMobile>Nenhuma placa encontrada.</EmptyMobile>}
       </div>
 
-      {/* Mobile Cards View (sm:hidden) */}
-      <div className="space-y-3 sm:hidden">
-        {filteredPlates.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-cardBorder p-8 text-center text-xs text-subText">
-            Nenhuma placa NFC encontrada para o filtro atual.
-          </div>
-        ) : (
-          filteredPlates.map((plate) => (
-            <div
-              key={plate.id}
-              className="bg-white rounded-3xl border border-cardBorder p-4.5 shadow-card space-y-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-pastel-purple text-primary flex items-center justify-center font-mono font-bold text-xs shrink-0 shadow-xs">
-                    <Cpu className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-sm text-mainText">{plate.code}</span>
-                      <button
-                        onClick={() => handleCopy(plate.code, plate.id)}
-                        className="text-subText hover:text-mainText p-0.5"
-                        title="Copiar código"
-                      >
-                        {copiedCode === plate.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <span className="text-[11px] text-subText font-mono block">{plate.serial_number}</span>
-                  </div>
-                </div>
-                <Badge status={plate.status} />
-              </div>
+      <div className="mt-5 grid grid-cols-3 divide-x divide-slate-100 rounded-2xl bg-white p-4 text-center shadow-sm"><div><strong className="block text-lg text-blue-600">{plates.filter((p) => p.status === 'active').length}</strong><span className="text-[9px] text-slate-400">Ativas</span></div><div><strong className="block text-lg text-amber-500">{plates.filter((p) => p.status === 'configuring').length}</strong><span className="text-[9px] text-slate-400">Configurando</span></div><div><strong className="block text-lg text-sky-500">{plates.filter((p) => p.status === 'in_stock').length}</strong><span className="text-[9px] text-slate-400">Estoque</span></div></div>
+      <button type="button" onClick={() => navigate('/app/inventory')} className="fixed bottom-24 right-5 z-20 grid h-14 w-14 place-items-center rounded-full bg-blue-600 text-white shadow-xl shadow-blue-300"><Plus size={24} /></button>
 
-              <div className="bg-[#F8F9FE] p-2.5 rounded-2xl space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-subText">Produto:</span>
-                  <span className="font-medium text-mainText">{plate.product_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-subText">Cliente:</span>
-                  <span className="font-semibold text-mainText">
-                    {plate.client_name || <em className="text-subText font-normal">Disponível no Estoque</em>}
-                  </span>
-                </div>
-              </div>
-
-              {/* Google URL status */}
-              <div className="pt-1 flex items-center justify-between gap-2">
-                {plate.google_review_url ? (
-                  <a
-                    href={plate.google_review_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline text-[11px] font-semibold flex items-center gap-1 truncate max-w-[190px]"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="truncate">URL Configurada</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                  </a>
-                ) : (
-                  <span className="text-amber-600 text-[11px] font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    Sem URL Google
-                  </span>
-                )}
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleOpenConfig(plate)}
-                  className="text-xs py-1.5 px-3 h-auto rounded-xl"
-                >
-                  <Edit className="w-3.5 h-3.5 mr-1" />
-                  Configurar
-                </Button>
-              </div>
+      {configuringPlate && (
+        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/55 p-3 backdrop-blur-sm" onClick={() => setConfiguringPlate(null)}>
+          <form onSubmit={saveConfiguration} className="mx-auto max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-[28px] bg-white p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between"><div><h2 className="text-base font-extrabold">Configurar placa</h2><p className="text-[10px] text-slate-400">Edite o identificador e o destino da placa</p></div><button type="button" onClick={() => setConfiguringPlate(null)} className="mobile-icon-button"><X size={18} /></button></div>
+            <div className="mt-5 space-y-4">
+              <label className="block"><span className="text-[10px] font-extrabold text-slate-600">Número da placa</span><div className="relative mt-1"><Pencil size={15} className="absolute left-3 top-3.5 text-slate-400" /><input required value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="NFC-000001" className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-3 font-mono text-xs font-bold outline-none focus:border-blue-500" /></div></label>
+              <label className="block"><span className="text-[10px] font-extrabold text-slate-600">Número serial / chip NFC</span><div className="relative mt-1"><Nfc size={15} className="absolute left-3 top-3.5 text-slate-400" /><input value={form.serial_number} onChange={(event) => setForm((current) => ({ ...current, serial_number: event.target.value.toUpperCase() }))} placeholder="SN-NFC-00001" className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-3 font-mono text-xs font-bold outline-none focus:border-blue-500" /></div></label>
+              <label className="block"><span className="text-[10px] font-extrabold text-slate-600">Cliente vinculado</span><div className="relative mt-1"><UserRound size={15} className="absolute left-3 top-3.5 text-slate-400" /><select value={form.client_id} onChange={(event) => setForm((current) => ({ ...current, client_id: event.target.value }))} className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-3 text-xs font-bold outline-none focus:border-blue-500"><option value="">Nenhum cliente</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></div></label>
+              <label className="block"><span className="text-[10px] font-extrabold text-slate-600">URL do Google Maps, avaliação ou Instagram</span><div className="relative mt-1"><MapPin size={15} className="absolute left-3 top-3.5 text-slate-400" /><input type="url" value={form.google_review_url} onChange={(event) => setForm((current) => ({ ...current, google_review_url: event.target.value }))} placeholder="https://maps.app.goo.gl/..." className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-3 text-xs font-semibold outline-none focus:border-blue-500" /></div><small className="mt-1 block text-[9px] text-slate-400">Esse será o destino usado pelo NFC e pelo QR Code.</small></label>
+              <label className="block"><span className="text-[10px] font-extrabold text-slate-600">Status da placa</span><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-bold outline-none focus:border-blue-500"><option value="in_stock">Em estoque</option><option value="reserved">Reservada</option><option value="sold">Vendida</option><option value="configuring">Configurando</option><option value="active">Ativa</option><option value="disabled">Desativada</option></select></label>
             </div>
-          ))
-        )}
-      </div>
-
-      {/* Desktop Plates Table (hidden sm:block) */}
-      <div className="hidden sm:block bg-white rounded-card border border-cardBorder shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-divider bg-[#F8FAFC] text-[11px] font-semibold text-subText uppercase tracking-wider">
-                <th className="py-3 px-4">Código / Serial</th>
-                <th className="py-3 px-4">Produto</th>
-                <th className="py-3 px-4">Cliente Vinculado</th>
-                <th className="py-3 px-4">Destino Google Reviews</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-divider/70 text-xs">
-              {filteredPlates.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="py-12 text-center text-subText">
-                    Nenhuma placa NFC encontrada para o filtro atual.
-                  </td>
-                </tr>
-              ) : (
-                filteredPlates.map((plate) => (
-                  <tr key={plate.id} className="hover:bg-gray-50/70 transition-colors">
-                    {/* Código / Serial */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-mainText text-xs">{plate.code}</span>
-                        <button
-                          onClick={() => handleCopy(plate.code, plate.id)}
-                          className="text-subText hover:text-mainText p-1"
-                          title="Copiar código"
-                        >
-                          {copiedCode === plate.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      <span className="text-[11px] text-subText font-mono">{plate.serial_number}</span>
-                    </td>
-
-                    {/* Produto */}
-                    <td className="py-3.5 px-4 font-medium text-mainText">
-                      {plate.product_name}
-                    </td>
-
-                    {/* Cliente */}
-                    <td className="py-3.5 px-4">
-                      {plate.client_name ? (
-                        <span className="font-semibold text-mainText">{plate.client_name}</span>
-                      ) : (
-                        <span className="text-subText italic text-[11px]">Nenhum cliente (Estoque)</span>
-                      )}
-                    </td>
-
-                    {/* URL Google Reviews */}
-                    <td className="py-3.5 px-4 max-w-xs">
-                      {plate.google_review_url ? (
-                        <a
-                          href={plate.google_review_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline font-mono text-[11px] flex items-center gap-1 truncate"
-                        >
-                          <span className="truncate">{plate.google_review_url}</span>
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                        </a>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 font-medium">
-                          <AlertCircle className="w-3 h-3" /> Aguardando URL
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="py-3.5 px-4">
-                      <Badge status={plate.status} />
-                    </td>
-
-                    {/* Ações */}
-                    <td className="py-3.5 px-4 text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleOpenConfig(plate)}
-                        className="text-xs py-1 px-2.5 h-auto"
-                      >
-                        <Edit className="w-3.5 h-3.5 mr-1" />
-                        Configurar
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+            <button type="submit" className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-blue-200">{saved ? <><Check size={16} /> Configuração salva!</> : <><Save size={16} /> Salvar configuração</>}</button>
+          </form>
         </div>
-      </div>
+      )}
 
-      {/* Configuração da Placa Modal */}
-      <Modal
-        isOpen={isConfigModalOpen}
-        onClose={() => setIsConfigModalOpen(false)}
-        title={`Configurar Placa ${selectedPlate?.code}`}
-        description="Atualize o status, vincule o cliente e informe a URL oficial de avaliação no Google."
-      >
-        <form onSubmit={handleSaveConfig} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-mainText mb-1.5">Status da Placa</label>
-            <select
-              value={editStatus}
-              onChange={(e) => setEditStatus(e.target.value)}
-              className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="in_stock">Em estoque</option>
-              <option value="reserved">Reservada</option>
-              <option value="sold">Vendida</option>
-              <option value="configuring">Configurando</option>
-              <option value="active">Ativa (Entregue e Funcionando)</option>
-              <option value="disabled">Desativada</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-mainText mb-1.5">Cliente Destino</label>
-            <select
-              value={editClientId}
-              onChange={(e) => setEditClientId(e.target.value)}
-              className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Nenhum cliente (Em Estoque)</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <Input
-            label="Google Review URL (Link direto de avaliação)"
-            placeholder="https://g.page/r/ExemploEmpresa/review"
-            value={editGoogleUrl}
-            onChange={(e) => setEditGoogleUrl(e.target.value)}
-          />
-
-          {/* QR Code Preview Box */}
-          <div className="bg-[#F8FAFC] p-4 rounded-xl border border-cardBorder">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white border border-cardBorder rounded-lg p-1 flex items-center justify-center">
-                <QrCode className="w-10 h-10 text-primary" />
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-mainText">Redirecionamento Inteligente</p>
-                <p className="text-[11px] text-subText font-mono truncate">
-                  {selectedPlate?.qr_code_url}
-                </p>
-                <p className="text-[10px] text-emerald-600 mt-1 font-medium">
-                  {editGoogleUrl ? '● Pronto para gravar no chip NFC e gerar QR' : '○ Insira a URL acima'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setIsConfigModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="primary">
-              Salvar Alterações
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Cadastrar Nova Placa Modal */}
-      <Modal
-        isOpen={isNewPlateModalOpen}
-        onClose={() => setIsNewPlateModalOpen(false)}
-        title="Cadastrar Nova Placa NFC"
-        description="Gere um identificador único para o novo lote de placas no estoque."
-      >
-        <form onSubmit={handleCreatePlate} className="space-y-4">
-          <Input
-            label="Código Identificador (Ex: NFC-000007)"
-            placeholder={`NFC-${String(plates.length + 1).padStart(6, '0')}`}
-            value={newCode}
-            onChange={(e) => setNewCode(e.target.value)}
-          />
-
-          <Input
-            label="Número de Série (Hardware / Chip)"
-            placeholder="Ex: SN-NFC-99412"
-            value={newSerial}
-            onChange={(e) => setNewSerial(e.target.value)}
-          />
-
-          <div>
-            <label className="block text-xs font-semibold text-mainText mb-1.5">Modelo do Produto</label>
-            <select
-              value={newProductId}
-              onChange={(e) => setNewProductId(e.target.value)}
-              className="w-full rounded-xl border border-divider bg-white px-3.5 py-2.5 text-sm text-mainText focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {products.map(p => (
-                <option key={p.id} value={p.id}>{p.name} (R$ {p.sale_price.toFixed(2)})</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setIsNewPlateModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="primary">
-              Cadastrar no Estoque
-            </Button>
-          </div>
-        </form>
-      </Modal>
-    </div>
+      {qrPlate && (
+        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/55 p-3 backdrop-blur-sm" onClick={() => setQrPlate(null)}><div className="mx-auto w-full max-w-md rounded-[28px] bg-white p-5" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between"><div><h2 className="text-base font-extrabold">QR Code da placa</h2><p className="font-mono text-[10px] text-slate-400">{qrPlate.code}</p></div><button type="button" onClick={() => setQrPlate(null)} className="mobile-icon-button"><X size={18} /></button></div><div className="mx-auto my-5 grid h-52 w-52 place-items-center rounded-3xl bg-slate-50 ring-1 ring-slate-100"><QrCode size={150} strokeWidth={1.3} /></div><p className="truncate rounded-xl bg-slate-50 p-3 text-center text-[10px] text-slate-500">{qrPlate.google_review_url || qrPlate.qr_code_url}</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => copyLink(qrPlate)} className="flex items-center justify-center gap-2 rounded-2xl bg-slate-100 py-3 text-xs font-bold"><Copy size={15} />{copied ? 'Copiado!' : 'Copiar link'}</button><button type="button" onClick={() => { openConfiguration(qrPlate); setQrPlate(null) }} className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3 text-xs font-bold text-white"><Link2 size={15} /> Configurar</button></div></div></div>
+      )}
+    </MobilePage>
   )
 }
