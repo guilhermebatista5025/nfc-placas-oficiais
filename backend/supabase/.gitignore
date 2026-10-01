@@ -1,2 +1,5 @@
 *secrets.json
 *migrations
+*config.toml
+!migrations/
+!migrations/*.sql

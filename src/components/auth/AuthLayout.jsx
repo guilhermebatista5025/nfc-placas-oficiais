@@ -1,26 +1,13 @@
-import React, { useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import React from 'react'
 import logo from '@/assets/logo.jpeg'
 import background from '@/assets/fundo-login.png'
 
 export function AuthLayout({ title, subtitle, children, footer }) {
-  const [dimmed, setDimmed] = useState(false)
-
   return (
     <main
-      className={`auth-shell${dimmed ? ' auth-shell--dimmed' : ''}`}
+      className="auth-shell"
       style={{ '--auth-background': `url(${background})` }}
     >
-      <button
-        type="button"
-        className="auth-theme-toggle"
-        aria-label={dimmed ? 'Ativar tema claro' : 'Reduzir brilho'}
-        aria-pressed={dimmed}
-        onClick={() => setDimmed((current) => !current)}
-      >
-        {dimmed ? <Sun size={19} /> : <Moon size={19} />}
-      </button>
-
       <section className="auth-panel">
         <div className="auth-logo-card">
           <img src={logo} alt="Craft Evolution Digital Architects" />

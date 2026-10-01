@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, Bell, ChevronRight, Search } from 'lucide-react'
+import { ArrowLeft, Bell, ChevronRight, CreditCard } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export function MobilePage({ children, className = '' }) {
@@ -27,7 +27,15 @@ export function MobileHeader({ title, subtitle, back = false, actions, compact =
       <div className="flex items-center gap-2">
         {actions || (
           <>
-            <button className="mobile-icon-button" type="button" aria-label="Buscar"><Search size={19} /></button>
+            <button
+              className="mobile-icon-button"
+              type="button"
+              aria-label="Planos e assinatura"
+              title="Planos e assinatura"
+              onClick={() => navigate('/app/billing')}
+            >
+              <CreditCard size={19} />
+            </button>
             <button className="mobile-icon-button relative" type="button" aria-label="Notificações" onClick={onNotifications}>
               <Bell size={19} />
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />

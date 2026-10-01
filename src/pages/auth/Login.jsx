@@ -21,7 +21,7 @@ export function Login() {
     setError('')
     try {
       await login(email, password, { remember })
-      navigate(location.state?.from || '/app', { replace: true })
+      navigate('/app/billing', { replace: true })
     } catch (requestError) {
       setError(requestError.message || 'Não foi possível entrar. Verifique suas credenciais.')
     } finally {

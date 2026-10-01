@@ -20,6 +20,7 @@ import { Billing } from '@/pages/billing/Billing'
 import { Settings } from '@/pages/settings/Settings'
 import { Finance } from '@/pages/finance/Finance'
 import { useAuth } from '@/contexts/AuthContext'
+import { PlanGate } from '@/components/billing/PlanGate'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -80,10 +81,10 @@ export function AppRoutes() {
         <Route path="sales/new" element={<NewSale />} />
         <Route path="products" element={<Products />} />
         <Route path="inventory" element={<Inventory />} />
-        <Route path="finance" element={<Finance />} />
-        <Route path="credentials" element={<Credentials />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="team" element={<Team />} />
+        <Route path="finance" element={<PlanGate feature="finance" title="Financeiro completo" requiredPlan="Starter"><Finance /></PlanGate>} />
+        <Route path="credentials" element={<PlanGate feature="credentials" title="Cofre de credenciais" requiredPlan="Pro"><Credentials /></PlanGate>} />
+        <Route path="reports" element={<PlanGate feature="reports" title="Relatórios avançados" requiredPlan="Pro"><Reports /></PlanGate>} />
+        <Route path="team" element={<PlanGate feature="team" title="Equipe e permissões" requiredPlan="Pro"><Team /></PlanGate>} />
         <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
       </Route>

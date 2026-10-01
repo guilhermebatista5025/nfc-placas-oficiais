@@ -25,7 +25,7 @@ export function Register() {
     setError('')
     try {
       const result = await register(email, password, name, organizationName)
-      if (result.session) navigate('/app')
+      if (result.session) navigate('/app/billing', { replace: true })
       else navigate('/login', { state: { notice: 'Conta criada. Confirme seu e-mail antes de entrar.' } })
     } catch (requestError) {
       setError(requestError.message || 'Não foi possível criar sua conta.')

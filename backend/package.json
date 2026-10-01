@@ -4,8 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file=.env src/server.js",
-    "start": "node --env-file=.env src/server.js",
-    "check": "node --check src/server.js && node --check src/config/env.js"
+    "dev": "node --watch --env-file=.env --env-file-if-exists=.env.stripe src/server.js",
+    "start": "node --env-file=.env --env-file-if-exists=.env.stripe src/server.js",
+    "check": "node --check src/server.js && node --check src/config/env.js && node --check src/config/plans.js && node --check src/lib/clients.js && node --check src/lib/http.js && node --check src/services/auth.js && node --check src/services/billing.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "stripe": "^23.0.0"
   }
 }

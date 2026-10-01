@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { getPlanEntitlements } from '@/config/plans'
 import * as api from '@/services/appData'
 
 const AppContext = createContext(null)
@@ -21,6 +22,8 @@ export function AppProvider({ children }) {
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const organizationId = user?.organization_id
+  const entitlements = useMemo(() => getPlanEntitlements(data.organization), [data.organization])
+  const hasFeature = useCallback((feature) => entitlements.access.has(feature), [entitlements])
 
   const reload = useCallback(async () => {
     if (!isSupabaseConfigured || !organizationId) return
@@ -57,6 +60,7 @@ export function AppProvider({ children }) {
 
   const addClient = async (newClient) => {
     requireBackend(isSupabaseConfigured)
+    assertWithinLimit('clientes', data.clients.length, 1, entitlements.limits.clients)
     const client = await api.insertClient(organizationId, { ...newClient, status: 'active' })
     setData((current) => ({ ...current, clients: [client, ...current.clients] }))
     return client
@@ -94,6 +98,7 @@ export function AppProvider({ children }) {
 
   const addPlateBatch = async ({ product, quantity, serialPrefix, destinationUrl = '', costPrice, salePrice, minimumStock }) => {
     requireBackend(isSupabaseConfigured)
+    assertWithinLimit('placas', data.plates.length, Number(quantity), entitlements.limits.plates)
     const created = await api.createPlateBatch({
       productId: product.id,
       quantity,
@@ -143,6 +148,8 @@ export function AppProvider({ children }) {
     addPlateBatch,
     addSale,
     addInventoryMovement,
+    entitlements,
+    hasFeature,
     searchQuery,
     setSearchQuery,
   }
@@ -161,6 +168,13 @@ export function AppProvider({ children }) {
 function requireBackend(configured) {
   if (!configured) {
     throw new Error('Supabase não configurado. Nenhum dado foi salvo.')
+  }
+}
+
+function assertWithinLimit(label, current, increment, limit) {
+  if (limit === null) return
+  if (current + increment > limit) {
+    throw new Error(`Seu plano permite até ${limit} ${label}. Faça upgrade para continuar.`)
   }
 }
 

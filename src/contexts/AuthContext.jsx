@@ -3,6 +3,32 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const AuthContext = createContext(null)
 
+function getAuthErrorMessage(error, fallback) {
+  const message = typeof error?.message === 'string' ? error.message.trim() : ''
+  const code = typeof error?.code === 'string' ? error.code : ''
+
+  if (code === 'user_already_exists' || /already registered|already exists/i.test(message)) {
+    return 'Este e-mail já possui uma conta. Tente fazer login ou recuperar a senha.'
+  }
+  if (code === 'signup_disabled' || /signups? (?:are )?disabled/i.test(message)) {
+    return 'A criação de novas contas está desativada no Supabase.'
+  }
+  if (code === 'weak_password' || /password/i.test(message) && /weak|least|characters/i.test(message)) {
+    return 'A senha não atende aos requisitos de segurança.'
+  }
+  if (code === 'over_email_send_rate_limit' || /rate limit/i.test(message)) {
+    return 'Muitas tentativas foram feitas. Aguarde alguns minutos e tente novamente.'
+  }
+  if (/database error saving new user/i.test(message)) {
+    return 'O banco não conseguiu finalizar o cadastro. Verifique a migration do trigger de usuários.'
+  }
+  if (!message || message === '{}' || message === '[object Object]') {
+    return fallback
+  }
+
+  return message
+}
+
 async function hydrateUser(authUser) {
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -68,11 +94,15 @@ export function AuthProvider({ children }) {
   const register = async (email, password, name, organizationName) => {
     if (!isSupabaseConfigured) throw new Error('Configure o Supabase no arquivo .env antes de criar uma conta.')
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
-      options: { data: { name, organization_name: organizationName } },
+      options: { data: { name: name.trim(), organization_name: organizationName.trim() } },
     })
-    if (error) throw error
+    if (error) {
+      throw new Error(getAuthErrorMessage(error, 'Não foi possível criar sua conta. Confira os dados e tente novamente.'), {
+        cause: error,
+      })
+    }
     if (data.session && data.user) setUser(await hydrateUser(data.user))
     return data
   }

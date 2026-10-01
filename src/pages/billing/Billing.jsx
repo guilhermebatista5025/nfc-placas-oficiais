@@ -1,141 +1,155 @@
-import React from 'react'
-import { CreditCard, Check, Sparkles, Zap, Shield } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { useApp } from '@/contexts/AppContext'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  Building2,
+  Check,
+  Layers3,
+  Rocket,
+  Sparkles,
+  UserRound,
+  X,
+} from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { PLAN_CATALOG } from '@/config/plans'
+import { fetchBillingSummary, openBillingPortal, startCheckout } from '@/services/billing'
+
+const plans = [
+  { ...PLAN_CATALOG.free, icon: UserRound, description: 'Para conhecer e começar sem custo.' },
+  { ...PLAN_CATALOG.starter, icon: Rocket, description: 'Para começar sua operação digital.' },
+  { ...PLAN_CATALOG.pro, icon: BriefcaseBusiness, popular: true, description: 'Para empresas prontas para crescer.' },
+  { ...PLAN_CATALOG.business, icon: Building2, description: 'Para grandes equipes e operações.' },
+]
 
 export function Billing() {
-  const { organization } = useApp()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState('')
+  const [error, setError] = useState('')
 
-  const plans = [
-    {
-      name: 'Starter',
-      price: 'R$ 97',
-      period: '/mês',
-      description: 'Ideal para profissionais autônomos ou início da operação.',
-      features: [
-        '1 usuário',
-        'Até 50 clientes',
-        'Até 200 placas NFC',
-        'Dashboard básico',
-        'Gestão de vendas',
-        'Suporte por e-mail'
-      ],
-      current: false,
-      popular: false
-    },
-    {
-      name: 'Pro',
-      price: 'R$ 247',
-      period: '/mês',
-      description: 'Perfeito para empresas em expansão e controle total de equipes.',
-      features: [
-        '5 usuários incluídos',
-        'Até 500 clientes cadastrados',
-        'Até 2.000 placas NFC',
-        'Relatórios financeiros e DRE',
-        'Cofre seguro de credenciais Google',
-        'Auditoria e logs de placas',
-        'Suporte prioritário via WhatsApp'
-      ],
-      current: true,
-      popular: true
-    },
-    {
-      name: 'Business',
-      price: 'R$ 597',
-      period: '/mês',
-      description: 'Estrutura robusta para grandes volumes e operações franqueadas.',
-      features: [
-        'Usuários ilimitados',
-        'Clientes ilimitados',
-        'Placas NFC ilimitadas',
-        'Permissões personalizadas (RBAC avançado)',
-        'Integrações com Google APIs e Webhooks',
-        'Gerente de conta exclusivo'
-      ],
-      current: false,
-      popular: false
+  const checkoutNotice = searchParams.get('checkout')
+  const subscription = summary?.subscription
+  const activePlan = useMemo(() => {
+    if (subscription?.planKey && PLAN_CATALOG[subscription.planKey]) return subscription.planKey
+    const label = `${subscription?.plan || ''}`.toLowerCase()
+    const paidPlan = plans.find((plan) => plan.key !== 'free' && label.includes(plan.key))?.key
+    return ['active', 'trialing', 'past_due'].includes(subscription?.status) && paidPlan ? paidPlan : 'free'
+  }, [subscription?.plan, subscription?.planKey, subscription?.status])
+
+  useEffect(() => {
+    let active = true
+    fetchBillingSummary()
+      .then((data) => { if (active) setSummary(data) })
+      .catch((requestError) => { if (active) setError(requestError.message) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  const redirect = async (action, key) => {
+    setBusy(key)
+    setError('')
+    try {
+      const result = await action()
+      if (!result.url) throw new Error('O Stripe não retornou o endereço de pagamento.')
+      window.location.assign(result.url)
+    } catch (requestError) {
+      setError(requestError.message)
+      setBusy('')
     }
-  ]
+  }
+
+  const handlePlan = (planKey) => {
+    if (planKey === 'free') {
+      if (hasPaidSubscription) return redirect(() => openBillingPortal('free'), 'plan-free')
+      return navigate('/app')
+    }
+    if (hasPaidSubscription) return redirect(() => openBillingPortal(planKey), `plan-${planKey}`)
+    return redirect(() => startCheckout(planKey), `plan-${planKey}`)
+  }
+
+  const hasPaidSubscription = subscription?.id && ['active', 'trialing', 'past_due'].includes(subscription?.status)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-heading text-mainText">Assinatura & Planos SaaS</h1>
-        <p className="text-xs text-subText mt-1">
-          Gerenciamento do plano da sua organização, faturamento e limites de placas contratadas.
-        </p>
-      </div>
+    <div className="pricing-page">
+      <div className="pricing-orb pricing-orb--top" />
+      <div className="pricing-orb pricing-orb--right" />
+      <button type="button" className="pricing-close" onClick={() => navigate('/app')} aria-label="Fechar planos" title="Fechar">
+        <X size={21} />
+      </button>
 
-      {/* Current Subscription Card */}
-      <div className="bg-white rounded-card border border-cardBorder p-6 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-subText">Plano Atual</span>
-            <span className="bg-primary/10 text-primary text-xs font-bold px-2.5 py-0.5 rounded-full">
-              {organization?.plan || 'Plano Pro'}
-            </span>
-          </div>
-          <p className="text-lg font-bold font-heading text-mainText mt-1">
-            Renovação programada para 15 de Outubro de 2026
-          </p>
-          <p className="text-xs text-subText mt-0.5">
-            Organização: {organization?.name} • Pagamento via Cartão Corporativo (•••• 4129)
-          </p>
-        </div>
-        <Button variant="outline" size="sm">
-          Gerenciar Pagamento
-        </Button>
-      </div>
+      <header className="pricing-hero">
+        <span className="pricing-kicker"><Layers3 size={16} /> Planos e Preços</span>
+        <h1>Escolha o plano<br />ideal para você</h1>
+        <p>Recursos poderosos para começar agora e escalar conforme o seu negócio cresce.</p>
+        <span className="pricing-test-badge"><Sparkles size={12} /> Ambiente de teste Stripe</span>
+      </header>
 
-      {/* Plans Comparison Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-        {plans.map((p) => (
-          <div
-            key={p.name}
-            className={`bg-white rounded-card border p-6 flex flex-col justify-between relative transition-all ${
-              p.current
-                ? 'border-primary ring-2 ring-primary/20 shadow-lg'
-                : 'border-cardBorder shadow-card'
-            }`}
-          >
-            {p.popular && (
-              <span className="absolute -top-3 right-6 bg-primary text-white text-[10px] uppercase font-bold tracking-wider px-3 py-0.5 rounded-full shadow-sm">
-                Mais Recomendado
-              </span>
-            )}
+      {checkoutNotice === 'success' && (
+        <Notice tone="success">Pagamento concluído. O plano será atualizado após a confirmação do webhook.</Notice>
+      )}
+      {checkoutNotice === 'cancelled' && (
+        <Notice tone="warning">Checkout cancelado. Nenhuma cobrança foi realizada.</Notice>
+      )}
+      {error && <Notice tone="error">{error}</Notice>}
 
-            <div>
-              <h3 className="text-lg font-bold font-heading text-mainText">{p.name}</h3>
-              <p className="text-xs text-subText mt-1 min-h-[32px]">{p.description}</p>
+      <section className="pricing-carousel mobile-carousel" aria-label="Planos disponíveis">
+        {plans.map((plan) => {
+          const Icon = plan.icon
+          const current = activePlan === plan.key
+          const planBusy = busy === `plan-${plan.key}`
 
-              <div className="mt-4 flex items-baseline gap-1">
-                <span className="text-3xl font-bold font-heading text-mainText">{p.price}</span>
-                <span className="text-xs text-subText font-medium">{p.period}</span>
-              </div>
+          return (
+            <article key={plan.key} className={`pricing-card${plan.popular ? ' pricing-card--popular' : ''}`}>
+              {plan.popular && <span className="pricing-ribbon">Mais popular</span>}
+              <span className="pricing-plan-icon"><Icon size={25} /></span>
+              <h2>{plan.name}</h2>
+              <p className="pricing-plan-description">{plan.description}</p>
 
-              <div className="mt-6 pt-4 border-t border-divider space-y-2.5 text-xs">
-                {p.features.map((feat, i) => (
-                  <div key={i} className="flex items-center gap-2 text-mainText">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{feat}</span>
-                  </div>
+              <ul className="pricing-features">
+                {plan.features.map((feature) => (
+                  <li key={feature}><span><Check size={14} /></span>{feature}</li>
                 ))}
-              </div>
-            </div>
+              </ul>
 
-            <div className="mt-8">
-              <Button
-                variant={p.current ? 'primary' : 'outline'}
-                className="w-full justify-center"
-                disabled={p.current}
+              <div className="pricing-price">
+                <small>R$</small>
+                <strong>{formatPlanPrice(plan.price)}</strong>
+                <span>/mês</span>
+              </div>
+
+              <button
+                type="button"
+                className={`pricing-cta${plan.popular ? ' pricing-cta--primary' : ''}`}
+                disabled={current || loading || Boolean(busy)}
+                onClick={() => handlePlan(plan.key)}
               >
-                {p.current ? 'Plano Ativo' : 'Fazer Upgrade'}
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+                <span>{planBusy
+                  ? 'Abrindo Stripe...'
+                  : current
+                    ? 'Plano atual'
+                    : plan.key === 'free'
+                      ? 'Cancelar e usar grátis'
+                      : hasPaidSubscription
+                        ? `Mudar para ${plan.name}`
+                        : `Assinar ${plan.name}`}</span>
+                {!current && !planBusy && <ArrowRight size={20} />}
+              </button>
+            </article>
+          )
+        })}
+      </section>
+
+      <div className="pricing-scroll-hint"><span /> Arraste para ver todos os planos <span /></div>
     </div>
   )
+}
+
+function Notice({ tone, children }) {
+  return <div className={`pricing-notice pricing-notice--${tone}`}>{children}</div>
+}
+
+function formatPlanPrice(value) {
+  return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

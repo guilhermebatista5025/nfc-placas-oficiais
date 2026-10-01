@@ -1,14 +1,17 @@
 import React from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
 
 export function DashboardLayout() {
+  const location = useLocation()
+  const isBilling = location.pathname === '/app/billing'
+
   return (
     <div className="mobile-app-shell">
-      <main className="mobile-app-content">
+      <main className={isBilling ? '' : 'mobile-app-content'}>
         <Outlet />
       </main>
-      <BottomNav />
+      {!isBilling && <BottomNav />}
     </div>
   )
 }

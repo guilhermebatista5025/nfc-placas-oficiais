@@ -1,9 +1,11 @@
 # Banco de dados Supabase
 
-O banco do MVP fica nas migrations, aplicadas em ordem:
+O cadastro e a identidade multi-tenant ficam nas migrations, aplicadas em ordem:
 
-1. `20260930000100_initial_backend.sql`: Auth, organizações, dados operacionais, RLS e funções transacionais.
-2. `20260930000200_backfill_existing_auth_users.sql`: recupera perfis e organizações de usuários Auth existentes sem alterar senhas.
+1. `20261001000100_users_and_registration.sql`: organizações, perfis, membros, trigger de cadastro e RLS.
+2. `20261001000200_backfill_auth_users.sql`: recupera perfis e organizações de usuários Auth existentes sem alterar senhas.
+3. `20261001000300_repair_existing_user_schema.sql`: completa colunas ausentes quando o projeto já tinha tabelas antigas.
+4. `20261001000400_stripe_billing.sql`: adiciona assinaturas, faturas, webhooks idempotentes e RLS de cobrança.
 
 ## Aplicar no projeto remoto
 
@@ -17,7 +19,7 @@ npx supabase link --project-ref SEU_PROJECT_REF
 npx supabase db push
 ```
 
-Como alternativa, cole a migration completa no SQL Editor do Supabase e execute uma única vez.
+Como alternativa, cole as migrations no SQL Editor do Supabase e execute-as na ordem indicada.
 
 3. Na raiz do projeto, copie `.env.example` para `.env` e preencha apenas as variáveis públicas do Vite:
 
@@ -35,15 +37,14 @@ http://localhost:5173/reset-password
 https://seu-dominio.com/reset-password
 ```
 
-## O que a migration entrega
+## O que estas migrations entregam
 
 - criação automática da organização e do usuário owner no cadastro;
-- isolamento multi-tenant com RLS em todas as tabelas operacionais;
-- clientes, produtos, placas, vendas, itens e estoque persistidos;
-- entrada de lote e venda executadas em transações no PostgreSQL;
-- saldo de estoque protegido contra valores negativos;
-- log de alterações;
-- metadados de credenciais separados dos secrets, que ficam no schema privado;
-- quatro produtos iniciais para cada nova organização.
+- perfil ligado ao usuário do Supabase Auth;
+- vínculo em `organization_members`;
+- funções `owner`, `admin`, `seller`, `operator` e `viewer`;
+- isolamento por organização com Row Level Security;
+- proteção contra autopromoção de função por usuários comuns;
+- recuperação dos usuários Auth criados antes da instalação do trigger.
 
 Sem `.env`, o sistema permanece na tela de login e bloqueia gravações. Não existe fallback que simule persistência local.
