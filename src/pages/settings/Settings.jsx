@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Settings as SettingsIcon, Building, Database, Shield, Save, Check } from 'lucide-react'
+import { Building, Database, Save, Check } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -13,16 +13,15 @@ export function Settings() {
   const [phone, setPhone] = useState(organization?.phone || '(27) 99876-5432')
   const [saved, setSaved] = useState(false)
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
-    setOrganization({
-      ...organization,
-      name,
-      email,
-      phone
-    })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    try {
+      await setOrganization({ name, email, phone })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (error) {
+      window.alert(error.message || 'Não foi possível salvar a organização.')
+    }
   }
 
   return (
@@ -91,7 +90,7 @@ export function Settings() {
             <p className="text-subText text-[11px] mt-0.5">
               {isSupabaseConfigured
                 ? 'Conectado diretamente ao projeto Supabase remoto.'
-                : 'Modo demonstração com armazenamento local reativo (Pronto para plugar variáveis .env).'}
+                : 'Modo demonstração somente em memória. Configure o .env para persistir no Supabase.'}
             </p>
           </div>
           <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
@@ -99,7 +98,7 @@ export function Settings() {
               ? 'bg-emerald-50 text-emerald-700'
               : 'bg-blue-50 text-blue-700'
           }`}>
-            {isSupabaseConfigured ? 'Conectado Remoto' : 'Ambiente Local Ativo'}
+            {isSupabaseConfigured ? 'Conectado Remoto' : 'Sem persistência'}
           </span>
         </div>
 

@@ -7,13 +7,13 @@ import googlePlateImage from '@/assets/produtos/placa-google.png'
 import instagramPlateImage from '@/assets/produtos/placas-instagram.png'
 
 const presets = [10, 25, 50, 100, 250]
-const productImages = { 'prod-01': googlePlateImage, 'prod-02': instagramPlateImage }
+const productImages = { 'NFC-PL-ACR': googlePlateImage, 'NFC-PL-INS': instagramPlateImage }
 
 export function Inventory() {
   const navigate = useNavigate()
   const carouselRef = useRef(null)
-  const { products, updateProductPricing, addPlateBatch, addInventoryMovement } = useApp()
-  const plateProducts = products.filter((item) => item.id === 'prod-01' || item.id === 'prod-02')
+  const { products, updateProductPricing, addPlateBatch } = useApp()
+  const plateProducts = products.filter((item) => item.sku === 'NFC-PL-ACR' || item.sku === 'NFC-PL-INS')
   const [productId, setProductId] = useState(plateProducts[0]?.id || '')
   const [quantity, setQuantity] = useState(10)
   const [cost, setCost] = useState(products[0]?.cost_price || 0)
@@ -37,7 +37,7 @@ export function Inventory() {
     setPricingDraft({ cost_price: cost, sale_price: salePrice, minimum_stock: minimumStock })
     setPricingOpen(true)
   }
-  const savePricing = (event) => {
+  const savePricing = async (event) => {
     event.preventDefault()
     const nextCost = Number(pricingDraft.cost_price || 0)
     const nextSalePrice = Number(pricingDraft.sale_price || 0)
@@ -45,20 +45,27 @@ export function Inventory() {
     setCost(nextCost)
     setSalePrice(nextSalePrice)
     setMinimumStock(nextMinimumStock)
-    updateProductPricing(product.id, { cost_price: nextCost, sale_price: nextSalePrice, minimum_stock: nextMinimumStock })
-    setPricingSaved(true)
-    setTimeout(() => setPricingOpen(false), 650)
+    try {
+      await updateProductPricing(product.id, { cost_price: nextCost, sale_price: nextSalePrice, minimum_stock: nextMinimumStock })
+      setPricingSaved(true)
+      setTimeout(() => setPricingOpen(false), 650)
+    } catch (error) {
+      window.alert(error.message || 'Não foi possível salvar os preços.')
+    }
   }
   const goToSlide = (index) => {
     carouselRef.current?.scrollTo({ left: carouselRef.current.clientWidth * index, behavior: 'smooth' })
     setActiveSlide(index)
   }
-  const submit = () => {
+  const submit = async () => {
     if (!product || quantity < 1) return
-    addPlateBatch({ product, quantity, serialPrefix: product.id === 'prod-01' ? 'GOOGLE' : 'INSTAGRAM', costPrice: cost, salePrice, minimumStock })
-    addInventoryMovement({ product_id: product.id, product_name: product.name, type: 'entry', quantity, unit_cost: Number(cost), sale_price: Number(salePrice), gross_result: grossResult, net_result: netResult, reason: `Entrada de lote com ${quantity} placas` })
-    setSaved(true)
-    setTimeout(() => navigate('/app/plates'), 1100)
+    try {
+      await addPlateBatch({ product, quantity, serialPrefix: product.sku === 'NFC-PL-ACR' ? 'GOOGLE' : 'INSTAGRAM', costPrice: cost, salePrice, minimumStock })
+      setSaved(true)
+      setTimeout(() => navigate('/app/plates'), 1100)
+    } catch (error) {
+      window.alert(error.message || 'Não foi possível cadastrar o lote.')
+    }
   }
 
   return (
@@ -72,8 +79,8 @@ export function Inventory() {
           {plateProducts.map((item) => (
             <button key={item.id} type="button" onClick={() => chooseProduct(item.id)} className={`relative overflow-hidden rounded-3xl p-2 text-left ring-2 transition ${productId === item.id ? 'bg-white ring-blue-600 shadow-lg shadow-blue-100' : 'bg-white ring-transparent shadow-sm'}`}>
               {productId === item.id && <span className="absolute right-3 top-3 z-10 grid h-6 w-6 place-items-center rounded-full bg-blue-600 text-white shadow"><Check size={13} /></span>}
-              <div className="aspect-square overflow-hidden rounded-2xl bg-slate-50"><img src={productImages[item.id]} alt={item.name} className="h-full w-full object-contain" /></div>
-              <div className="px-1 pb-1 pt-2"><strong className="block text-[11px] leading-tight text-slate-900">{item.id === 'prod-01' ? 'Placa Google' : 'Placa Instagram'}</strong><div className="mt-1 flex items-center justify-between"><span className="text-[9px] text-slate-400">{item.current_stock} em estoque</span><Contactless size={14} className={item.id === 'prod-01' ? 'text-blue-600' : 'text-pink-500'} /></div></div>
+              <div className="aspect-square overflow-hidden rounded-2xl bg-slate-50"><img src={productImages[item.sku]} alt={item.name} className="h-full w-full object-contain" /></div>
+              <div className="px-1 pb-1 pt-2"><strong className="block text-[11px] leading-tight text-slate-900">{item.sku === 'NFC-PL-ACR' ? 'Placa Google' : 'Placa Instagram'}</strong><div className="mt-1 flex items-center justify-between"><span className="text-[9px] text-slate-400">{item.current_stock} em estoque</span><Contactless size={14} className={item.sku === 'NFC-PL-ACR' ? 'text-blue-600' : 'text-pink-500'} /></div></div>
             </button>
           ))}
         </div>
@@ -109,7 +116,7 @@ export function Inventory() {
       {pricingOpen && (
         <div className="fixed inset-0 z-50 flex items-end bg-slate-950/55 p-3 backdrop-blur-sm" onClick={() => setPricingOpen(false)}>
           <form onSubmit={savePricing} className="mx-auto w-full max-w-md rounded-[28px] bg-white p-5" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between"><div><h2 className="text-base font-extrabold">{product?.pricing_configured ? 'Editar valores' : 'Configurar valores'}</h2><p className="mt-0.5 text-[10px] text-slate-400">{product?.id === 'prod-01' ? 'Placa Google' : 'Placa Instagram'} • os dados ficarão salvos</p></div><button type="button" onClick={() => setPricingOpen(false)} className="mobile-icon-button"><X size={18} /></button></div>
+            <div className="flex items-center justify-between"><div><h2 className="text-base font-extrabold">{product?.pricing_configured ? 'Editar valores' : 'Configurar valores'}</h2><p className="mt-0.5 text-[10px] text-slate-400">{product?.sku === 'NFC-PL-ACR' ? 'Placa Google' : 'Placa Instagram'} • os dados ficarão salvos</p></div><button type="button" onClick={() => setPricingOpen(false)} className="mobile-icon-button"><X size={18} /></button></div>
             <div className="mt-5 space-y-3">
               <label className="block rounded-2xl bg-rose-50 p-3"><span className="flex items-center gap-1 text-[9px] font-extrabold uppercase text-rose-500"><CircleDollarSign size={13} /> Valor pago ao fornecedor</span><div className="mt-2 flex items-center rounded-xl bg-white px-3 ring-1 ring-rose-100"><span className="text-xs font-bold text-slate-400">R$</span><input required autoFocus type="number" min="0" step="0.01" value={pricingDraft.cost_price} onChange={(event) => setPricingDraft((current) => ({ ...current, cost_price: event.target.value }))} className="min-w-0 flex-1 bg-transparent p-3 text-sm font-extrabold outline-none" /></div><small className="mt-1 block text-[8px] text-rose-400">Custo de compra de uma placa</small></label>
               <label className="block rounded-2xl bg-emerald-50 p-3"><span className="flex items-center gap-1 text-[9px] font-extrabold uppercase text-emerald-600"><CircleDollarSign size={13} /> Preço de venda</span><div className="mt-2 flex items-center rounded-xl bg-white px-3 ring-1 ring-emerald-100"><span className="text-xs font-bold text-slate-400">R$</span><input required type="number" min="0" step="0.01" value={pricingDraft.sale_price} onChange={(event) => setPricingDraft((current) => ({ ...current, sale_price: event.target.value }))} className="min-w-0 flex-1 bg-transparent p-3 text-sm font-extrabold outline-none" /></div><small className="mt-1 block text-[8px] text-emerald-500">Valor cobrado por uma placa</small></label>

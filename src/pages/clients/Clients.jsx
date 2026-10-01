@@ -41,12 +41,16 @@ export function Clients() {
     return haystack.includes(query.toLowerCase()) && segmentMatch && statusMatch
   })
 
-  const submitClient = (event) => {
+  const submitClient = async (event) => {
     event.preventDefault()
     if (!form.name.trim()) return
-    const client = addClient({ ...form, business_segment: form.business_segment || 'Comércio Geral', city: form.city || 'Vila Velha' })
-    setSaved(true)
-    setTimeout(() => { setFormOpen(false); setSaved(false); setForm(emptyForm); navigate(`/app/clients/${client.id}`) }, 700)
+    try {
+      const client = await addClient({ ...form, business_segment: form.business_segment || 'Comércio Geral', city: form.city || 'Vila Velha' })
+      setSaved(true)
+      setTimeout(() => { setFormOpen(false); setSaved(false); setForm(emptyForm); navigate(`/app/clients/${client.id}`) }, 700)
+    } catch (error) {
+      window.alert(error.message || 'Não foi possível cadastrar o cliente.')
+    }
   }
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }))
   const exportClients = () => {

@@ -24,11 +24,15 @@ export function NewSale() {
   const money = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   const updateQuantity = (id, amount) => setItems((current) => current.map((item) => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + amount) } : item))
   const addProduct = () => { const next = products.find((product) => !items.some((item) => item.id === product.id)); if (next) setItems((current) => [...current, { ...next, quantity: 1 }]) }
-  const submit = () => {
+  const submit = async () => {
     if (!client || !items.length) return
-    addSale({ client_id: client.id, client_name: client.name, channel, location: 'Loja Vila Velha', items_count: items.reduce((sum, item) => sum + item.quantity, 0), product_name: items[0].name, subtotal, discount: Number(discount || 0), total, cost: items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), profit: total - items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), payment_method: payment, payment_status: paid ? 'paid' : 'pending', reserve_hardware: reserve })
-    setSaved(true)
-    setTimeout(() => navigate('/app'), 900)
+    try {
+      await addSale({ client_id: client.id, client_name: client.name, items, channel, location: 'Loja Vila Velha', items_count: items.reduce((sum, item) => sum + item.quantity, 0), product_name: items[0].name, subtotal, discount: Number(discount || 0), total, cost: items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), profit: total - items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), payment_method: payment, payment_status: paid ? 'paid' : 'pending', reserve_hardware: reserve })
+      setSaved(true)
+      setTimeout(() => navigate('/app'), 900)
+    } catch (error) {
+      window.alert(error.message || 'Não foi possível registrar a venda.')
+    }
   }
 
   return (

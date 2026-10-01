@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import {
   initialOrganization,
   initialClients,
@@ -6,183 +6,241 @@ import {
   initialPlates,
   initialSales,
   initialInventoryMovements,
-  initialCredentials
+  initialCredentials,
 } from '@/data/mockData'
+import { useAuth } from '@/contexts/AuthContext'
+import * as api from '@/services/appData'
 
 const AppContext = createContext(null)
-const PRODUCTS_STORAGE_KEY = 'craft-nfc-products'
 
-function loadStoredProducts() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(PRODUCTS_STORAGE_KEY))
-    if (!Array.isArray(stored)) return initialProducts
-    return initialProducts.map(product => ({ ...product, ...(stored.find(item => item.id === product.id) || {}) }))
-  } catch {
-    return initialProducts
-  }
+const demoData = {
+  organization: initialOrganization,
+  clients: initialClients,
+  products: initialProducts,
+  plates: initialPlates,
+  sales: initialSales,
+  inventoryMovements: initialInventoryMovements,
+  credentials: initialCredentials,
+}
+
+const emptyData = {
+  organization: null,
+  clients: [],
+  products: [],
+  plates: [],
+  sales: [],
+  inventoryMovements: [],
+  credentials: [],
 }
 
 export function AppProvider({ children }) {
-  const [organization, setOrganization] = useState(initialOrganization)
-  const [clients, setClients] = useState(initialClients)
-  const [products, setProducts] = useState(loadStoredProducts)
-  const [plates, setPlates] = useState(initialPlates)
-  const [sales, setSales] = useState(initialSales)
-  const [inventoryMovements, setInventoryMovements] = useState(initialInventoryMovements)
-  const [credentials, setCredentials] = useState(initialCredentials)
+  const { user, loading: authLoading, isSupabaseConfigured } = useAuth()
+  const [data, setData] = useState(isSupabaseConfigured ? emptyData : demoData)
+  const [loading, setLoading] = useState(isSupabaseConfigured)
+  const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const organizationId = user?.organization_id
+
+  const reload = useCallback(async () => {
+    if (!isSupabaseConfigured || !organizationId) return
+    setLoading(true)
+    setError('')
+    try {
+      setData(await api.fetchAppData(organizationId))
+    } catch (requestError) {
+      setError(requestError.message || 'Não foi possível carregar os dados do Supabase.')
+    } finally {
+      setLoading(false)
+    }
+  }, [isSupabaseConfigured, organizationId])
 
   useEffect(() => {
-    localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products))
-  }, [products])
-
-  // Client operations
-  const addClient = (newClient) => {
-    const client = {
-      ...newClient,
-      id: 'cli-' + Date.now(),
-      status: 'active',
-      created_at: new Date().toISOString().split('T')[0]
+    if (!authLoading && user) reload()
+    if (!authLoading && !user && isSupabaseConfigured) {
+      setData(emptyData)
+      setLoading(false)
     }
-    setClients(prev => [client, ...prev])
+  }, [authLoading, user, isSupabaseConfigured, reload])
+
+  const setOrganization = async (changes) => {
+    if (!data.organization) return null
+    if (!isSupabaseConfigured) {
+      const next = { ...data.organization, ...changes }
+      setData((current) => ({ ...current, organization: next }))
+      return next
+    }
+    const saved = await api.patchOrganization(data.organization.id, {
+      name: changes.name,
+      email: changes.email,
+      phone: changes.phone,
+    })
+    setData((current) => ({ ...current, organization: { ...saved, logoUrl: saved.logo_url } }))
+    return saved
+  }
+
+  const addClient = async (newClient) => {
+    const client = isSupabaseConfigured
+      ? await api.insertClient(organizationId, { ...newClient, status: 'active' })
+      : { ...newClient, id: `demo-client-${Date.now()}`, status: 'active', created_at: new Date().toISOString() }
+    setData((current) => ({ ...current, clients: [client, ...current.clients] }))
     return client
   }
 
-  const updateClient = (id, updatedData) => {
-    setClients(prev => prev.map(c => c.id === id ? { ...c, ...updatedData } : c))
+  const updateClient = async (id, changes) => {
+    const client = isSupabaseConfigured
+      ? await api.patchClient(id, changes)
+      : { ...data.clients.find((item) => item.id === id), ...changes }
+    setData((current) => ({ ...current, clients: current.clients.map((item) => item.id === id ? client : item) }))
+    return client
   }
 
-  // Plate operations
-  const addPlate = (plateData) => {
-    const plate = {
-      ...plateData,
-      id: 'plt-' + Date.now(),
-      code: plateData.code || `NFC-${String(plates.length + 1).padStart(6, '0')}`,
-      status: plateData.status || 'in_stock',
-      qr_code_url: `https://craftnfc.com/r/${plateData.code || `NFC-${String(plates.length + 1).padStart(6, '0')}`}`,
-      activated_at: plateData.status === 'active' ? new Date().toISOString().split('T')[0] : null
-    }
-    setPlates(prev => [plate, ...prev])
-    return plate
-  }
-
-  const addPlateBatch = ({ product, quantity, serialPrefix, destinationUrl = '', costPrice, salePrice, minimumStock }) => {
-    const batchId = Date.now()
-    const start = plates.length + 1
-    const newPlates = Array.from({ length: quantity }, (_, index) => {
-      const code = `NFC-${String(start + index).padStart(6, '0')}`
-      return {
-        id: `plt-${batchId}-${index}`,
-        code,
-        serial_number: `${serialPrefix || 'SN-NFC'}-${String(start + index).padStart(5, '0')}`,
-        product_id: product.id,
-        product_name: product.name,
-        client_name: null,
-        client_id: null,
-        status: 'in_stock',
-        google_review_url: destinationUrl,
-        qr_code_url: `https://craftnfc.com/r/${code}`,
-        activated_at: null
-      }
-    })
-    setPlates(prev => [...newPlates, ...prev])
-    setProducts(prev => prev.map(item => item.id === product.id ? {
-      ...item,
-      current_stock: Number(item.current_stock || 0) + quantity,
-      cost_price: Number(costPrice ?? item.cost_price),
-      sale_price: Number(salePrice ?? item.sale_price),
-      minimum_stock: Number(minimumStock ?? item.minimum_stock)
-    } : item))
-    return newPlates
-  }
-
-  const updateProductPricing = (id, pricing) => {
-    setProducts(prev => prev.map(item => item.id === id ? {
-      ...item,
+  const updateProductPricing = async (id, pricing) => {
+    const changes = {
       cost_price: Number(pricing.cost_price),
       sale_price: Number(pricing.sale_price),
       minimum_stock: Number(pricing.minimum_stock),
-      pricing_configured: true
-    } : item))
+      pricing_configured: true,
+    }
+    const product = isSupabaseConfigured
+      ? await api.patchProduct(id, changes)
+      : { ...data.products.find((item) => item.id === id), ...changes }
+    setData((current) => ({ ...current, products: current.products.map((item) => item.id === id ? product : item) }))
+    return product
   }
 
-  const updatePlate = (id, updatedData) => {
-    setPlates(prev => prev.map(p => {
-      if (p.id === id) {
-        const isActivating = updatedData.status === 'active' && p.status !== 'active'
+  const updatePlate = async (id, changes) => {
+    const currentPlate = data.plates.find((item) => item.id === id)
+    const activatedAt = changes.status === 'active' && currentPlate?.status !== 'active' ? new Date().toISOString() : undefined
+    let plate
+    if (isSupabaseConfigured) {
+      const saved = await api.patchPlate(id, { ...changes, ...(activatedAt ? { activated_at: activatedAt } : {}) })
+      plate = { ...saved, product_name: saved.product?.name || '', client_name: saved.client?.name || null }
+    } else {
+      plate = { ...currentPlate, ...changes, ...(activatedAt ? { activated_at: activatedAt } : {}) }
+    }
+    setData((current) => ({ ...current, plates: current.plates.map((item) => item.id === id ? plate : item) }))
+    return plate
+  }
+
+  const addPlateBatch = async ({ product, quantity, serialPrefix, destinationUrl = '', costPrice, salePrice, minimumStock }) => {
+    if (!isSupabaseConfigured) {
+      const start = data.plates.length + 1
+      const created = Array.from({ length: quantity }, (_, index) => {
+        const code = `NFC-${String(start + index).padStart(6, '0')}`
         return {
-          ...p,
-          ...updatedData,
-          activated_at: isActivating ? new Date().toISOString().split('T')[0] : p.activated_at
+          id: `demo-plate-${Date.now()}-${index}`,
+          code,
+          serial_number: `${serialPrefix || 'SN-NFC'}-${String(start + index).padStart(5, '0')}`,
+          product_id: product.id,
+          product_name: product.name,
+          client_id: null,
+          client_name: null,
+          status: 'in_stock',
+          google_review_url: destinationUrl,
+          qr_code_url: `/r/${code}`,
+          activated_at: null,
         }
-      }
-      return p
-    }))
+      })
+      setData((current) => ({
+        ...current,
+        plates: [...created, ...current.plates],
+        products: current.products.map((item) => item.id === product.id ? {
+          ...item,
+          current_stock: Number(item.current_stock) + quantity,
+          cost_price: Number(costPrice),
+          sale_price: Number(salePrice),
+          minimum_stock: Number(minimumStock),
+        } : item),
+      }))
+      return created
+    }
+    const created = await api.createPlateBatch({
+      productId: product.id,
+      quantity,
+      serialPrefix,
+      destinationUrl,
+      costPrice,
+      salePrice,
+      minimumStock,
+    })
+    await reload()
+    return created
   }
 
-  // Sale operations
-  const addSale = (saleData) => {
-    const sale = {
-      ...saleData,
-      id: 'sl-' + Date.now(),
-      number: String(sales.length + 54).padStart(5, '0'),
-      sale_date: new Date().toISOString().split('T')[0],
-      status: saleData.status || 'completed',
-      payment_status: saleData.payment_status || 'paid'
+  const addSale = async (saleData) => {
+    if (!isSupabaseConfigured) {
+      const sale = {
+        ...saleData,
+        id: `demo-sale-${Date.now()}`,
+        number: String(data.sales.length + 1).padStart(5, '0'),
+        sale_date: new Date().toISOString().slice(0, 10),
+        status: 'completed',
+      }
+      setData((current) => ({ ...current, sales: [sale, ...current.sales] }))
+      return sale
     }
-    setSales(prev => [sale, ...prev])
-
-    // Update inventory movement
-    const movement = {
-      id: 'mov-' + Date.now(),
-      type: 'exit',
-      product_name: saleData.product_name || 'Venda de itens NFC',
-      quantity: -(saleData.items_count || 1),
-      reason: `Venda #${sale.number} (${sale.client_name})`,
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      author: 'Sistema'
-    }
-    setInventoryMovements(prev => [movement, ...prev])
-
+    const sale = await api.createSale({
+      clientId: saleData.client_id,
+      items: saleData.items.map((item) => ({ product_id: item.id, quantity: item.quantity })),
+      channel: saleData.channel,
+      location: saleData.location,
+      discount: Number(saleData.discount || 0),
+      paymentMethod: saleData.payment_method,
+      paymentStatus: saleData.payment_status,
+      reserveHardware: saleData.reserve_hardware,
+    })
+    await reload()
     return sale
   }
 
-  // Inventory operations
-  const addInventoryMovement = (movementData) => {
-    const mov = {
-      ...movementData,
-      id: 'mov-' + Date.now(),
-      created_at: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      author: 'Admin'
+  const addInventoryMovement = async (movementData) => {
+    if (!isSupabaseConfigured) {
+      const movement = { ...movementData, id: `demo-movement-${Date.now()}`, created_at: new Date().toISOString(), author: 'Admin' }
+      setData((current) => ({ ...current, inventoryMovements: [movement, ...current.inventoryMovements] }))
+      return movement
     }
-    setInventoryMovements(prev => [mov, ...prev])
+    const movement = await api.insertInventoryMovement(organizationId, movementData)
+    await reload()
+    return movement
+  }
+
+  const value = {
+    ...data,
+    loading,
+    error,
+    reload,
+    setOrganization,
+    addClient,
+    updateClient,
+    updateProductPricing,
+    updatePlate,
+    addPlateBatch,
+    addSale,
+    addInventoryMovement,
+    searchQuery,
+    setSearchQuery,
   }
 
   return (
-    <AppContext.Provider
-      value={{
-        organization,
-        setOrganization,
-        clients,
-        addClient,
-        updateClient,
-        products,
-        updateProductPricing,
-        plates,
-        addPlate,
-        addPlateBatch,
-        updatePlate,
-        sales,
-        addSale,
-        inventoryMovements,
-        addInventoryMovement,
-        credentials,
-        searchQuery,
-        setSearchQuery
-      }}
-    >
-      {children}
+    <AppContext.Provider value={value}>
+      {loading
+        ? <BackendState title="Carregando seus dados..." />
+        : error
+          ? <BackendState title="Falha ao conectar ao backend" detail={error} action={reload} />
+          : children}
     </AppContext.Provider>
+  )
+}
+
+function BackendState({ title, detail, action }) {
+  return (
+    <div className="grid min-h-dvh place-items-center bg-slate-50 p-6 text-center">
+      <div>
+        <strong className="text-sm text-slate-900">{title}</strong>
+        {detail && <p className="mt-2 max-w-sm text-xs text-rose-600">{detail}</p>}
+        {action && <button type="button" onClick={action} className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white">Tentar novamente</button>}
+      </div>
+    </div>
   )
 }
 

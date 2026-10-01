@@ -1,96 +1,101 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const AuthContext = createContext(null)
+const demoUser = {
+  id: 'demo-user',
+  name: 'Usuário demonstração',
+  email: 'demo@craft.local',
+  role: 'owner',
+  organization_id: 'demo-organization',
+  organization_name: 'Craft Evolution',
+}
+
+async function hydrateUser(authUser) {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, organization_id, name, email, avatar_url, role, status, organization:organizations(name)')
+    .eq('id', authUser.id)
+    .single()
+  if (error) throw error
+  return {
+    ...profile,
+    organization_name: profile.organization?.name || '',
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState({
-    id: 'user-01',
-    name: 'Bruno Craft',
-    email: 'bruno@craftevolution.com.br',
-    role: 'owner', // owner, admin, seller, operator, viewer
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
-    organization_id: 'org-craft-01',
-    organization_name: 'Craft Evolution'
-  })
-  const [loading, setLoading] = useState(false)
+  const [user, setUser] = useState(isSupabaseConfigured ? null : demoUser)
+  const [loading, setLoading] = useState(isSupabaseConfigured)
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return
+    if (!isSupabaseConfigured) return undefined
+    let active = true
 
-    // Supabase auth subscription
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          name: session.user.user_metadata?.name || session.user.email?.split('@')[0],
-          email: session.user.email,
-          role: session.user.user_metadata?.role || 'owner',
-          organization_id: session.user.user_metadata?.organization_id || 'org-craft-01',
-          organization_name: 'Craft Evolution'
-        })
-      } else {
-        setUser(null)
+    const applySession = async (session) => {
+      try {
+        const nextUser = session?.user ? await hydrateUser(session.user) : null
+        if (active) setUser(nextUser)
+      } catch {
+        if (active) setUser(null)
+      } finally {
+        if (active) setLoading(false)
       }
-      setLoading(false)
+    }
+
+    supabase.auth.getSession().then(({ data }) => applySession(data.session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      window.setTimeout(() => applySession(session), 0)
     })
 
     return () => {
+      active = false
       subscription.unsubscribe()
     }
   }, [])
 
   const login = async (email, password) => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      return data
-    } else {
-      // Mock login
-      setUser({
-        id: 'user-01',
-        name: email.split('@')[0] || 'Usuário Craft',
-        email,
-        role: 'owner',
-        organization_id: 'org-craft-01',
-        organization_name: 'Craft Evolution'
-      })
-      return { user }
+    if (!isSupabaseConfigured) {
+      setUser({ ...demoUser, name: email.split('@')[0], email })
+      return { user: demoUser }
     }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    const profile = await hydrateUser(data.user)
+    setUser(profile)
+    return data
   }
 
   const logout = async () => {
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut()
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
     }
-    setUser(null)
+    setUser(isSupabaseConfigured ? null : demoUser)
   }
 
-  const register = async (email, password, name, orgName) => {
-    if (isSupabaseConfigured) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name, orgName, role: 'owner' }
-        }
-      })
-      if (error) throw error
-      return data
-    } else {
-      setUser({
-        id: 'user-' + Date.now(),
-        name,
-        email,
-        role: 'owner',
-        organization_id: 'org-' + Date.now(),
-        organization_name: orgName
-      })
-    }
+  const register = async (email, password, name, organizationName) => {
+    if (!isSupabaseConfigured) throw new Error('Configure o Supabase no arquivo .env antes de criar uma conta.')
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, organization_name: organizationName } },
+    })
+    if (error) throw error
+    if (data.session && data.user) setUser(await hydrateUser(data.user))
+    return data
+  }
+
+  const resetPassword = async (email) => {
+    if (!isSupabaseConfigured) throw new Error('Configure o Supabase antes de recuperar a senha.')
+    const redirectTo = `${window.location.origin}/reset-password`
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    if (error) throw error
+    return data
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register, isSupabaseConfigured }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, resetPassword, isSupabaseConfigured }}>
       {children}
     </AuthContext.Provider>
   )

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, User, Building2, ShieldCheck } from 'lucide-react'
+import { Mail, Lock, User, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/contexts/AuthContext'
@@ -20,8 +20,9 @@ export function Register() {
     setLoading(true)
     setError('')
     try {
-      await register(email, password, name, orgName)
-      navigate('/app')
+      const result = await register(email, password, name, orgName)
+      if (result.session) navigate('/app')
+      else navigate('/login', { state: { notice: 'Conta criada. Confirme seu e-mail antes de entrar.' } })
     } catch (err) {
       setError(err.message || 'Erro ao registrar nova empresa.')
     } finally {

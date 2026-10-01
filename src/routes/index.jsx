@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Login } from '@/pages/auth/Login'
 import { Register } from '@/pages/auth/Register'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
+import { ResetPassword } from '@/pages/auth/ResetPassword'
 import { Dashboard } from '@/pages/dashboard/Dashboard'
 import { Clients } from '@/pages/clients/Clients'
 import { ClientDetail } from '@/pages/clients/ClientDetail'
@@ -21,7 +22,10 @@ import { Finance } from '@/pages/finance/Finance'
 import { useAuth } from '@/contexts/AuthContext'
 
 function ProtectedRoute({ children }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  if (loading) {
+    return <div className="grid min-h-dvh place-items-center bg-slate-50 text-xs font-semibold text-slate-500">Validando sessão...</div>
+  }
   if (!user) {
     return <Navigate to="/login" replace />
   }
@@ -35,6 +39,7 @@ export function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Root redirect */}
       <Route path="/" element={<Navigate to="/app" replace />} />

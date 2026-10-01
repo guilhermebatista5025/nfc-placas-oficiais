@@ -3,14 +3,27 @@ import { Link } from 'react-router-dom'
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useAuth } from '@/contexts/AuthContext'
 
 export function ForgotPassword() {
+  const { resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitted(true)
+    setLoading(true)
+    setError('')
+    try {
+      await resetPassword(email)
+      setSubmitted(true)
+    } catch (requestError) {
+      setError(requestError.message || 'Não foi possível enviar o link de recuperação.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -44,6 +57,7 @@ export function ForgotPassword() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
               <Input
                 label="Seu e-mail cadastrado"
                 type="email"
@@ -54,7 +68,7 @@ export function ForgotPassword() {
                 required
               />
 
-              <Button type="submit" variant="primary" size="lg" className="w-full mt-2">
+              <Button type="submit" variant="primary" size="lg" className="w-full mt-2" isLoading={loading}>
                 Enviar Link de Recuperação
               </Button>
 

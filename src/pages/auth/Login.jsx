@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Mail, Lock, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
   const [email, setEmail] = useState('bruno@craftevolution.com.br')
   const [password, setPassword] = useState('••••••••')
@@ -46,6 +47,11 @@ export function Login() {
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
               {error}
+            </div>
+          )}
+          {location.state?.notice && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+              {location.state.notice}
             </div>
           )}
 

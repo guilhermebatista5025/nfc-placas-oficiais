@@ -24,12 +24,15 @@ export function Plates() {
     setSaved(false)
     setForm({ code: plate.code || '', serial_number: plate.serial_number || '', client_id: plate.client_id || '', google_review_url: plate.google_review_url || '', status: plate.status || 'configuring' })
   }
-  const saveConfiguration = (event) => {
+  const saveConfiguration = async (event) => {
     event.preventDefault()
-    const client = clients.find((item) => item.id === form.client_id)
-    updatePlate(configuringPlate.id, { ...form, client_name: client?.name || null })
-    setSaved(true)
-    setTimeout(() => setConfiguringPlate(null), 650)
+    try {
+      await updatePlate(configuringPlate.id, { ...form, client_id: form.client_id || null })
+      setSaved(true)
+      setTimeout(() => setConfiguringPlate(null), 650)
+    } catch (error) {
+      window.alert(error.message || 'Não foi possível salvar a placa.')
+    }
   }
   const copyLink = async (plate) => {
     await navigator.clipboard?.writeText(plate.qr_code_url)

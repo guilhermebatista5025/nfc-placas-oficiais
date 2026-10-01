@@ -11,7 +11,7 @@ export function InventoryMovementsSheet({ open, onClose }) {
   const visible = useMemo(() => inventoryMovements.filter((movement) => (filter === 'all' || movement.type === filter) && `${movement.product_name} ${movement.reason}`.toLowerCase().includes(query.toLowerCase())), [inventoryMovements, filter, query])
   const entries = inventoryMovements.filter((item) => item.quantity > 0).reduce((sum, item) => sum + item.quantity, 0)
   const exits = Math.abs(inventoryMovements.filter((item) => item.quantity < 0).reduce((sum, item) => sum + item.quantity, 0))
-  const stock = products.filter((item) => item.id === 'prod-01' || item.id === 'prod-02').reduce((sum, item) => sum + Number(item.current_stock || 0), 0)
+  const stock = products.filter((item) => item.sku === 'NFC-PL-ACR' || item.sku === 'NFC-PL-INS').reduce((sum, item) => sum + Number(item.current_stock || 0), 0)
   const iconFor = (type) => ({ entry: ArrowDownLeft, exit: ArrowUpRight, adjustment: RefreshCw, return: Undo2 }[type] || Bell)
   const toneFor = (type) => ({ entry: 'bg-emerald-50 text-emerald-600', exit: 'bg-blue-50 text-blue-600', adjustment: 'bg-amber-50 text-amber-600', return: 'bg-violet-50 text-violet-600' }[type] || 'bg-slate-100 text-slate-600')
 
