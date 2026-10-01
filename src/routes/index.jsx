@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Login } from '@/pages/auth/Login'
 import { Register } from '@/pages/auth/Register'
@@ -23,26 +23,44 @@ import { useAuth } from '@/contexts/AuthContext'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
+  const location = useLocation()
   if (loading) {
-    return <div className="grid min-h-dvh place-items-center bg-slate-50 text-xs font-semibold text-slate-500">Validando sessão...</div>
+    return <RouteLoading />
   }
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
   return children
+}
+
+function PublicOnlyRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <RouteLoading />
+  if (user) return <Navigate to="/app" replace />
+  return children
+}
+
+function EntryRoute() {
+  const { user, loading } = useAuth()
+  if (loading) return <RouteLoading />
+  return <Navigate to={user ? '/app' : '/login'} replace />
+}
+
+function RouteLoading() {
+  return <div className="grid min-h-dvh place-items-center bg-slate-50 text-xs font-semibold text-slate-500">Validando sessão...</div>
 }
 
 export function AppRoutes() {
   return (
     <Routes>
       {/* Public Auth Routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+      <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Root redirect */}
-      <Route path="/" element={<Navigate to="/app" replace />} />
+      <Route path="/" element={<EntryRoute />} />
 
       {/* Protected App Routes */}
       <Route
@@ -71,7 +89,7 @@ export function AppRoutes() {
       </Route>
 
       {/* Catch-all fallback */}
-      <Route path="*" element={<Navigate to="/app" replace />} />
+      <Route path="*" element={<EntryRoute />} />
     </Routes>
   )
 }

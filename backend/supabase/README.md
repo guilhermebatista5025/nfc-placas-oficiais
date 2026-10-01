@@ -1,6 +1,9 @@
 # Banco de dados Supabase
 
-O banco do MVP fica em `migrations/20260930000100_initial_backend.sql`.
+O banco do MVP fica nas migrations, aplicadas em ordem:
+
+1. `20260930000100_initial_backend.sql`: Auth, organizações, dados operacionais, RLS e funções transacionais.
+2. `20260930000200_backfill_existing_auth_users.sql`: recupera perfis e organizações de usuários Auth existentes sem alterar senhas.
 
 ## Aplicar no projeto remoto
 
@@ -43,4 +46,4 @@ https://seu-dominio.com/reset-password
 - metadados de credenciais separados dos secrets, que ficam no schema privado;
 - quatro produtos iniciais para cada nova organização.
 
-Sem `.env`, o front abre em modo demonstração somente em memória. Nenhum dado desse modo sobrevive a um recarregamento.
+Sem `.env`, o sistema permanece na tela de login e bloqueia gravações. Não existe fallback que simule persistência local.

@@ -2,14 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const AuthContext = createContext(null)
-const demoUser = {
-  id: 'demo-user',
-  name: 'Usuário demonstração',
-  email: 'demo@craft.local',
-  role: 'owner',
-  organization_id: 'demo-organization',
-  organization_name: 'Craft Evolution',
-}
 
 async function hydrateUser(authUser) {
   const { data: profile, error } = await supabase
@@ -25,7 +17,7 @@ async function hydrateUser(authUser) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(isSupabaseConfigured ? null : demoUser)
+  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
 
   useEffect(() => {
@@ -56,8 +48,7 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     if (!isSupabaseConfigured) {
-      setUser({ ...demoUser, name: email.split('@')[0], email })
-      return { user: demoUser }
+      throw new Error('Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env para entrar.')
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
@@ -71,7 +62,7 @@ export function AuthProvider({ children }) {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
     }
-    setUser(isSupabaseConfigured ? null : demoUser)
+    setUser(null)
   }
 
   const register = async (email, password, name, organizationName) => {

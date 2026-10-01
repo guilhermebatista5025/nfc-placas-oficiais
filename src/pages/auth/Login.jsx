@@ -1,113 +1,87 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Mail, Lock, ShieldCheck } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import { AuthField, AuthLayout, AuthSubmitButton } from '@/components/auth/AuthLayout'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
-  const [email, setEmail] = useState('bruno@craftevolution.com.br')
-  const [password, setPassword] = useState('••••••••')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setLoading(true)
     setError('')
     try {
-      await login(email, password)
-      navigate('/app')
-    } catch (err) {
-      setError(err.message || 'Erro ao realizar login. Verifique suas credenciais.')
+      await login(email, password, { remember })
+      navigate(location.state?.from || '/app', { replace: true })
+    } catch (requestError) {
+      setError(requestError.message || 'Não foi possível entrar. Verifique suas credenciais.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-md">
-        {/* Brand */}
-        <div className="text-center mb-8">
-          <div className="mx-auto h-12 w-12 rounded-2xl bg-primary flex items-center justify-center text-white font-bold font-heading text-2xl shadow-sm mb-3">
-            C
-          </div>
-          <h1 className="text-2xl font-bold font-heading text-mainText">Craft NFC Manager</h1>
-          <p className="text-xs text-subText mt-1">Plataforma SaaS de Gestão de Placas NFC & Avaliações</p>
-        </div>
-
-        {/* Card */}
-        <div className="bg-white rounded-card border border-cardBorder p-8 shadow-card">
-          <h2 className="text-base font-bold text-mainText mb-4">Acesse sua conta</h2>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
-              {error}
-            </div>
-          )}
-          {location.state?.notice && (
-            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
-              {location.state.notice}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="E-mail de Acesso"
-              type="email"
-              icon={Mail}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <div>
-              <Input
-                label="Senha"
-                type="password"
-                icon={Lock}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <div className="flex justify-end mt-1.5">
-                <Link
-                  to="/forgot-password"
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  Esqueceu a senha?
-                </Link>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full mt-2"
-              isLoading={loading}
-            >
-              Entrar na Plataforma
-            </Button>
-          </form>
-
-          <div className="mt-6 pt-5 border-t border-divider text-center text-xs text-subText">
-            Não tem uma conta ainda?{' '}
-            <Link to="/register" className="text-primary font-semibold hover:underline">
-              Cadastre sua empresa
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-6 text-center text-[11px] text-subText flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Ambiente seguro protegido por Supabase RLS</span>
-        </div>
+    <AuthLayout
+      title="Bem-vindo de volta"
+      subtitle="Entre para continuar"
+      footer={<><ShieldCheck size={15} /> Ambiente protegido pelo Supabase</>}
+    >
+      <div className="auth-messages" aria-live="polite">
+        {error && <p className="auth-alert auth-alert--error">{error}</p>}
+        {location.state?.notice && <p className="auth-alert auth-alert--success">{location.state.notice}</p>}
       </div>
-    </div>
+
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <AuthField
+          icon={Mail}
+          label="E-mail"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoComplete="email"
+          required
+        />
+
+        <AuthField
+          icon={LockKeyhole}
+          label="Senha"
+          type={showPassword ? 'text' : 'password'}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="current-password"
+          required
+          action={(
+            <button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>
+              {showPassword ? <EyeOff size={21} /> : <Eye size={21} />}
+            </button>
+          )}
+        />
+
+        <div className="auth-form-options">
+          <label className="auth-checkbox">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            <span aria-hidden="true">✓</span>
+            Lembrar de mim
+          </label>
+          <Link to="/forgot-password">Esqueceu a senha?</Link>
+        </div>
+
+        <AuthSubmitButton loading={loading}>Entrar</AuthSubmitButton>
+      </form>
+
+      <div className="auth-switch">
+        <span>Primeiro acesso?</span>
+        <Link to="/register">Criar minha conta</Link>
+      </div>
+    </AuthLayout>
   )
 }
