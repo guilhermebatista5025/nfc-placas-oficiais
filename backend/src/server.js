@@ -4,6 +4,7 @@ import { requireAuth } from './services/auth.js'
 import {
   createCheckoutSession,
   confirmCheckoutSession,
+  cancelSubscriptionAtPeriodEnd,
   createPortalSession,
   createServiceInvoice,
   getBillingSummary,
@@ -73,6 +74,12 @@ export async function handleRequest(request, response) {
       const { profile } = await requireAuth(request, ['owner', 'admin'])
       const body = await readJson(request)
       return sendJson(response, 201, await createPortalSession(profile.organization_id, body.planKey), origin)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/billing/cancel') {
+      const { profile } = await requireAuth(request, ['owner', 'admin'])
+      await readJson(request)
+      return sendJson(response, 200, await cancelSubscriptionAtPeriodEnd(profile.organization_id), origin)
     }
 
     if (request.method === 'POST' && url.pathname === '/api/billing/invoices') {

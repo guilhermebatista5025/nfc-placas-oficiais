@@ -40,6 +40,10 @@ export function openBillingPortal(planKey) {
   return apiRequest('/api/billing/portal', { method: 'POST', body: JSON.stringify({ planKey }) })
 }
 
+export function scheduleSubscriptionCancellation() {
+  return apiRequest('/api/billing/cancel', { method: 'POST', body: JSON.stringify({}) })
+}
+
 export function createStripeInvoice(invoice) {
   return apiRequest('/api/billing/invoices', { method: 'POST', body: JSON.stringify(invoice) })
 }

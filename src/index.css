@@ -81,6 +81,14 @@
 .pricing-cancel:active:not(:disabled) { transform: translateY(0); }
 .pricing-cancel:focus-visible { outline: 3px solid rgba(190,72,87,.28); outline-offset: 3px; }
 .pricing-cancel:disabled { cursor: wait; opacity: .6; }
+.pricing-cancel-confirmation { position: relative; z-index: 1; margin: 12px 20px 0; padding: 15px; border: 1px solid rgba(75,112,180,.18); border-radius: 20px; color: #40577d; background: rgba(255,255,255,.82); box-shadow: 0 8px 20px rgba(52,86,145,.09); text-align: center; }
+.pricing-cancel-confirmation > p { font-size: 11px; font-weight: 600; line-height: 1.5; }
+.pricing-cancel-confirmation__actions { display: flex; justify-content: center; gap: 9px; margin-top: 13px; }
+.pricing-cancel-confirm, .pricing-cancel-keep { min-height: 40px; padding: 0 13px; border-radius: 13px; font-size: 10px; font-weight: 800; cursor: pointer; transition: transform .18s ease, opacity .18s ease; }
+.pricing-cancel-confirm { color: white; background: linear-gradient(110deg,#3869f4,#3d88f7); box-shadow: 0 5px 12px rgba(42,94,225,.2); }
+.pricing-cancel-keep { border: 1px solid rgba(75,112,180,.18); color: #49658f; background: #f5f8ff; }
+.pricing-cancel-confirm:hover:not(:disabled), .pricing-cancel-keep:hover:not(:disabled) { transform: translateY(-1px); }
+.pricing-cancel-confirm:disabled, .pricing-cancel-keep:disabled { cursor: wait; opacity: .65; }
 .pricing-invoices { position: relative; z-index: 1; margin: 26px 20px 0; padding: 19px; border: 1px solid rgba(255,255,255,.9); border-radius: 26px; background: rgba(255,255,255,.7); box-shadow: 8px 11px 25px rgba(62,103,168,.1); backdrop-filter: blur(16px); }
 .pricing-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .pricing-section-heading h2 { display: flex; align-items: center; gap: 7px; color: #0b1743; font-size: 13px; font-weight: 800; }

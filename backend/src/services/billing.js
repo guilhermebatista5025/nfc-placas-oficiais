@@ -177,6 +177,42 @@ export async function createPortalSession(organizationId, targetPlanKey) {
   return { url: session.url }
 }
 
+export async function cancelSubscriptionAtPeriodEnd(organizationId) {
+  requireStripe()
+  const organization = await getOrganization(organizationId)
+  const subscriptionId = organization.stripe_subscription_id
+  if (!subscriptionId) throw new HttpError(409, 'NÃ£o hÃ¡ uma assinatura ativa para cancelar.', 'subscription_not_found')
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+  if (organization.stripe_customer_id && customerId !== organization.stripe_customer_id) {
+    throw new HttpError(409, 'A assinatura nÃ£o corresponde a esta organizaÃ§Ã£o.', 'subscription_customer_mismatch')
+  }
+  if (!ACCESS_STATUSES.has(subscription.status)) {
+    throw new HttpError(409, 'A assinatura nÃ£o estÃ¡ ativa e nÃ£o pode ser cancelada.', 'subscription_not_active')
+  }
+
+  if (subscription.cancel_at_period_end) {
+    return { cancelAtPeriodEnd: true, currentPeriodEnd: unixToIso(subscriptionPeriodEnd(subscription)) }
+  }
+
+  let updatedSubscription
+  try {
+    updatedSubscription = await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true })
+  } catch (error) {
+    if (error?.statusCode === 403 || error?.type === 'StripePermissionError') {
+      throw new HttpError(503, 'A chave Stripe da Vercel precisa da permissÃ£o para atualizar assinaturas.', 'stripe_subscription_permission_missing')
+    }
+    throw error
+  }
+
+  await updateSubscription(updatedSubscription)
+  return {
+    cancelAtPeriodEnd: Boolean(updatedSubscription.cancel_at_period_end),
+    currentPeriodEnd: unixToIso(subscriptionPeriodEnd(updatedSubscription)),
+  }
+}
+
 async function ensureClientCustomer(organizationId, clientId) {
   const { data: client, error } = await supabaseAdmin
     .from('clients')

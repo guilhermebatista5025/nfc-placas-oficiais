@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PLAN_CATALOG } from '@/config/plans'
-import { confirmCheckoutSession, fetchBillingSummary, openBillingPortal, startCheckout } from '@/services/billing'
+import { confirmCheckoutSession, fetchBillingSummary, openBillingPortal, scheduleSubscriptionCancellation, startCheckout } from '@/services/billing'
 
 const plans = [
   { ...PLAN_CATALOG.pro, icon: BriefcaseBusiness, popular: true, description: 'Operação completa, sem limite de placas, clientes ou equipe.' },
@@ -23,6 +23,8 @@ export function Billing() {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [checkoutSync, setCheckoutSync] = useState('')
+  const [cancelConfirmation, setCancelConfirmation] = useState(false)
+  const [cancelNotice, setCancelNotice] = useState('')
 
   const checkoutNotice = searchParams.get('checkout')
   const checkoutSessionId = searchParams.get('session_id')
@@ -98,7 +100,27 @@ export function Billing() {
     return redirect(() => startCheckout(planKey), `plan-${planKey}`)
   }
 
-  const cancelSubscription = () => redirect(() => openBillingPortal('free'), 'cancel-subscription')
+  const cancelSubscription = async () => {
+    setBusy('cancel-subscription')
+    setError('')
+    setCancelNotice('')
+    try {
+      const result = await scheduleSubscriptionCancellation()
+      const periodEnd = result.currentPeriodEnd || subscription?.currentPeriodEnd
+      const date = periodEnd ? new Date(periodEnd).toLocaleDateString('pt-BR') : 'o fim do período atual'
+      setSummary((current) => current ? {
+        ...current,
+        subscription: { ...current.subscription, cancelAtPeriodEnd: true, currentPeriodEnd: periodEnd || current.subscription.currentPeriodEnd },
+      } : current)
+      setCancelConfirmation(false)
+      setCancelNotice(`Cancelamento agendado. Seu plano continua ativo até ${date}.`)
+      fetchBillingSummary().then(setSummary).catch(() => {})
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusy('')
+    }
+  }
 
   const hasPaidSubscription = subscription?.id && ['active', 'trialing', 'past_due'].includes(subscription?.status)
 
@@ -130,6 +152,10 @@ export function Billing() {
         <Notice tone="warning">Checkout cancelado. Nenhuma cobrança foi realizada.</Notice>
       )}
       {error && <Notice tone="error">{error}</Notice>}
+      {cancelNotice && <Notice tone="success">{cancelNotice}</Notice>}
+      {subscription?.cancelAtPeriodEnd && !cancelNotice && (
+        <Notice tone="warning">Sua assinatura estÃ¡ programada para terminar em {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('pt-BR') : 'no fim do perÃ­odo atual'}. O acesso continua ativo atÃ© lÃ¡.</Notice>
+      )}
 
       <section className="pricing-carousel pricing-carousel--single mobile-carousel" aria-label="Plano disponível">
         {plans.map((plan) => {
@@ -177,9 +203,22 @@ export function Billing() {
       </section>
 
       {hasPaidSubscription && (
-        <button type="button" className="pricing-cancel" disabled={Boolean(busy)} onClick={cancelSubscription}>
-          {busy === 'cancel-subscription' ? 'Abrindo Stripe...' : 'Cancelar assinatura'}
-        </button>
+        <>
+          <button type="button" className="pricing-cancel" disabled={Boolean(busy) || subscription.cancelAtPeriodEnd} onClick={() => { setCancelConfirmation(true); setError(''); setCancelNotice('') }}>
+            {subscription.cancelAtPeriodEnd ? 'Cancelamento agendado' : 'Cancelar assinatura'}
+          </button>
+          {cancelConfirmation && !subscription.cancelAtPeriodEnd && (
+            <div className="pricing-cancel-confirmation" role="group" aria-label="Confirmar cancelamento da assinatura">
+              <p>A assinatura serÃ¡ encerrada no fim do perÃ­odo atual. Seu acesso continua ativo atÃ© essa data.</p>
+              <div className="pricing-cancel-confirmation__actions">
+                <button type="button" className="pricing-cancel-keep" disabled={Boolean(busy)} onClick={() => setCancelConfirmation(false)}>Manter assinatura</button>
+                <button type="button" className="pricing-cancel-confirm" disabled={Boolean(busy)} onClick={cancelSubscription}>
+                  {busy === 'cancel-subscription' ? 'Agendando...' : 'Confirmar cancelamento'}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
       <div className="pricing-scroll-hint"><span /> Uma assinatura, todos os recursos <span /></div>
     </div>

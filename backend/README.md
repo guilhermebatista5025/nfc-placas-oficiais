@@ -60,6 +60,7 @@ Rotas disponíveis:
 - `GET /api/billing/summary`
 - `POST /api/billing/checkout`
 - `POST /api/billing/portal`
+- `POST /api/billing/cancel`
 - `POST /api/billing/invoices`
 - `POST /api/stripe/webhook`
 
