@@ -1,9 +1,9 @@
-import { createServer } from 'node:http'
 import { env } from './config/env.js'
 import { HttpError, readBody, readJson, sendJson } from './lib/http.js'
 import { requireAuth } from './services/auth.js'
 import {
   createCheckoutSession,
+  confirmCheckoutSession,
   createPortalSession,
   createServiceInvoice,
   getBillingSummary,
@@ -16,7 +16,7 @@ function allowedOrigin(request) {
   return request.headers.origin === env.frontendUrl ? request.headers.origin : env.frontendUrl
 }
 
-const server = createServer(async (request, response) => {
+export async function handleRequest(request, response) {
   const origin = allowedOrigin(request)
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
 
@@ -62,6 +62,13 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 201, result, origin)
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/billing/checkout/confirm') {
+      const { profile } = await requireAuth(request)
+      const body = await readJson(request)
+      const result = await confirmCheckoutSession(profile.organization_id, body.sessionId)
+      return sendJson(response, 200, result, origin)
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/billing/portal') {
       const { profile } = await requireAuth(request, ['owner', 'admin'])
       const body = await readJson(request)
@@ -93,15 +100,6 @@ const server = createServer(async (request, response) => {
     if (status >= 500) console.error(error)
     return sendJson(response, status, { error: message, code }, origin)
   }
-})
-
-server.listen(env.port, '127.0.0.1', () => {
-  console.log(`Craft NFC backend disponível em http://127.0.0.1:${env.port}`)
-})
-
-function shutdown() {
-  server.close(() => process.exit(0))
 }
 
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
+export default handleRequest

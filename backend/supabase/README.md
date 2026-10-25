@@ -7,6 +7,8 @@ O cadastro e a identidade multi-tenant ficam nas migrations, aplicadas em ordem:
 3. `20261001000300_repair_existing_user_schema.sql`: completa colunas ausentes quando o projeto já tinha tabelas antigas.
 4. `20261001000400_stripe_billing.sql`: adiciona assinaturas, faturas, webhooks idempotentes e RLS de cobrança.
 
+5. `20261025000100_craft_completo_unlimited_entitlements.sql`: libera todos os recursos e remove os limites de usuários, clientes e placas do Craft Completo.
+
 ## Aplicar no projeto remoto
 
 1. Crie ou abra o projeto no Supabase.
@@ -21,14 +23,14 @@ npx supabase db push
 
 Como alternativa, cole as migrations no SQL Editor do Supabase e execute-as na ordem indicada.
 
-3. Na raiz do projeto, copie `.env.example` para `.env` e preencha apenas as variáveis públicas do Vite:
+3. Em `backend/.env`, configure as variáveis públicas do frontend:
 
 ```env
 VITE_SUPABASE_URL=https://SEU_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=SUA_CHAVE_ANON_OU_PUBLISHABLE
 ```
 
-Nunca coloque `service_role`, senha do banco ou chave de criptografia em variável `VITE_*`.
+O Vite lê esse arquivo, mas só disponibiliza variáveis com prefixo `VITE_` no frontend. Nunca coloque `service_role`, senha do banco ou chave de criptografia em uma variável `VITE_*`.
 
 4. Em Authentication > URL Configuration, cadastre as URLs local e de produção, incluindo:
 

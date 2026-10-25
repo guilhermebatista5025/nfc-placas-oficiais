@@ -7,6 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Frontend public variables are stored with the backend environment file.
+  envDir: path.resolve(__dirname, './backend'),
   plugins: [react()],
   resolve: {
     alias: {

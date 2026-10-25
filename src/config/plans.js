@@ -19,11 +19,11 @@ export const PLAN_CATALOG = Object.freeze({
   },
   pro: {
     key: 'pro',
-    name: 'Pro',
-    price: 39.99,
-    limits: { users: 5, clients: 500, plates: 2000 },
-    features: ['5 usuários', 'Até 500 clientes', 'Até 2.000 placas', 'Relatórios, cofre e equipe'],
-    access: ['dashboard', 'clients', 'plates', 'sales', 'inventory', 'finance', 'reports', 'credentials', 'team'],
+    name: 'Craft Completo',
+    price: 19.99,
+    limits: { users: null, clients: null, plates: null },
+    features: ['Usuários ilimitados', 'Clientes ilimitados', 'Placas NFC ilimitadas', 'Todos os recursos incluídos'],
+    access: ['dashboard', 'clients', 'plates', 'sales', 'inventory', 'finance', 'reports', 'credentials', 'team', 'business'],
   },
   business: {
     key: 'business',

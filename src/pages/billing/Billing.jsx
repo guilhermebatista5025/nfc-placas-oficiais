@@ -2,23 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   BriefcaseBusiness,
-  Building2,
   Check,
   Layers3,
-  Rocket,
   Sparkles,
-  UserRound,
   X,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PLAN_CATALOG } from '@/config/plans'
-import { fetchBillingSummary, openBillingPortal, startCheckout } from '@/services/billing'
+import { confirmCheckoutSession, fetchBillingSummary, openBillingPortal, startCheckout } from '@/services/billing'
 
 const plans = [
-  { ...PLAN_CATALOG.free, icon: UserRound, description: 'Para conhecer e começar sem custo.' },
-  { ...PLAN_CATALOG.starter, icon: Rocket, description: 'Para começar sua operação digital.' },
-  { ...PLAN_CATALOG.pro, icon: BriefcaseBusiness, popular: true, description: 'Para empresas prontas para crescer.' },
-  { ...PLAN_CATALOG.business, icon: Building2, description: 'Para grandes equipes e operações.' },
+  { ...PLAN_CATALOG.pro, icon: BriefcaseBusiness, popular: true, description: 'Operação completa, sem limite de placas, clientes ou equipe.' },
 ]
 
 export function Billing() {
@@ -28,8 +22,10 @@ export function Billing() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [checkoutSync, setCheckoutSync] = useState('')
 
   const checkoutNotice = searchParams.get('checkout')
+  const checkoutSessionId = searchParams.get('session_id')
   const subscription = summary?.subscription
   const activePlan = useMemo(() => {
     if (subscription?.planKey && PLAN_CATALOG[subscription.planKey]) return subscription.planKey
@@ -40,12 +36,49 @@ export function Billing() {
 
   useEffect(() => {
     let active = true
-    fetchBillingSummary()
-      .then((data) => { if (active) setSummary(data) })
-      .catch((requestError) => { if (active) setError(requestError.message) })
-      .finally(() => { if (active) setLoading(false) })
+    const syncBilling = async () => {
+      const startedAt = Date.now()
+      let firstRequest = true
+
+      while (active) {
+        try {
+          const confirmation = checkoutNotice === 'success' && checkoutSessionId
+            ? await confirmCheckoutSession(checkoutSessionId)
+            : null
+          const data = await fetchBillingSummary()
+          if (!active) return
+          setSummary(data)
+          setError('')
+          if (confirmation?.confirmed && ['active', 'trialing', 'past_due'].includes(data.subscription?.status)) {
+            setCheckoutSync('confirmed')
+            break
+          }
+          if (checkoutNotice !== 'success' || !checkoutSessionId) break
+          setCheckoutSync('pending')
+        } catch (requestError) {
+          if (!active) return
+          setError(requestError.message)
+        } finally {
+          if (firstRequest && active) {
+            setLoading(false)
+            firstRequest = false
+          }
+        }
+
+        if (checkoutNotice !== 'success' || !checkoutSessionId) break
+        if (Date.now() - startedAt >= 120_000) {
+          if (active) setCheckoutSync('delayed')
+          break
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 3000))
+      }
+
+      if (active) setLoading(false)
+    }
+
+    syncBilling()
     return () => { active = false }
-  }, [])
+  }, [checkoutNotice, checkoutSessionId])
 
   const redirect = async (action, key) => {
     setBusy(key)
@@ -61,13 +94,11 @@ export function Billing() {
   }
 
   const handlePlan = (planKey) => {
-    if (planKey === 'free') {
-      if (hasPaidSubscription) return redirect(() => openBillingPortal('free'), 'plan-free')
-      return navigate('/app')
-    }
     if (hasPaidSubscription) return redirect(() => openBillingPortal(planKey), `plan-${planKey}`)
     return redirect(() => startCheckout(planKey), `plan-${planKey}`)
   }
+
+  const cancelSubscription = () => redirect(() => openBillingPortal('free'), 'cancel-subscription')
 
   const hasPaidSubscription = subscription?.id && ['active', 'trialing', 'past_due'].includes(subscription?.status)
 
@@ -81,20 +112,26 @@ export function Billing() {
 
       <header className="pricing-hero">
         <span className="pricing-kicker"><Layers3 size={16} /> Planos e Preços</span>
-        <h1>Escolha o plano<br />ideal para você</h1>
-        <p>Recursos poderosos para começar agora e escalar conforme o seu negócio cresce.</p>
-        <span className="pricing-test-badge"><Sparkles size={12} /> Ambiente de teste Stripe</span>
+        <h1>Tudo que você precisa<br />por um preço só</h1>
+        <p>Um plano completo para gerenciar sua operação NFC sem limite de placas.</p>
+        <span className="pricing-test-badge"><Sparkles size={12} /> Cobrança mensal pelo Stripe</span>
       </header>
 
       {checkoutNotice === 'success' && (
-        <Notice tone="success">Pagamento concluído. O plano será atualizado após a confirmação do webhook.</Notice>
+        <Notice tone={checkoutSync === 'confirmed' ? 'success' : 'warning'}>
+          {checkoutSync === 'confirmed'
+            ? 'Pagamento confirmado. Seu plano foi ativado automaticamente.'
+            : checkoutSync === 'delayed'
+              ? 'A Stripe ainda está processando a confirmação. Recarregue esta tela em instantes.'
+              : 'Pagamento concluído. Confirmando e ativando seu plano automaticamente...'}
+        </Notice>
       )}
       {checkoutNotice === 'cancelled' && (
         <Notice tone="warning">Checkout cancelado. Nenhuma cobrança foi realizada.</Notice>
       )}
       {error && <Notice tone="error">{error}</Notice>}
 
-      <section className="pricing-carousel mobile-carousel" aria-label="Planos disponíveis">
+      <section className="pricing-carousel pricing-carousel--single mobile-carousel" aria-label="Plano disponível">
         {plans.map((plan) => {
           const Icon = plan.icon
           const current = activePlan === plan.key
@@ -129,11 +166,9 @@ export function Billing() {
                   ? 'Abrindo Stripe...'
                   : current
                     ? 'Plano atual'
-                    : plan.key === 'free'
-                      ? 'Cancelar e usar grátis'
-                      : hasPaidSubscription
-                        ? `Mudar para ${plan.name}`
-                        : `Assinar ${plan.name}`}</span>
+                    : hasPaidSubscription
+                      ? `Mudar para ${plan.name}`
+                      : `Assinar ${plan.name}`}</span>
                 {!current && !planBusy && <ArrowRight size={20} />}
               </button>
             </article>
@@ -141,7 +176,12 @@ export function Billing() {
         })}
       </section>
 
-      <div className="pricing-scroll-hint"><span /> Arraste para ver todos os planos <span /></div>
+      {hasPaidSubscription && (
+        <button type="button" className="pricing-cancel" disabled={Boolean(busy)} onClick={cancelSubscription}>
+          {busy === 'cancel-subscription' ? 'Abrindo Stripe...' : 'Cancelar assinatura'}
+        </button>
+      )}
+      <div className="pricing-scroll-hint"><span /> Uma assinatura, todos os recursos <span /></div>
     </div>
   )
 }

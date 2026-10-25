@@ -51,6 +51,8 @@ STRIPE_WEBHOOK_SECRET=whsec_segredo_local
 
 5. Reinicie o backend após alterar variáveis de ambiente.
 
+A oferta atual usa `STRIPE_PRICE_PRO` como preço recorrente ativo de BRL 19,99 por mês. O backend confere moeda, valor e intervalo antes de criar o checkout; configure esse ID no Dashboard Stripe e em `backend/.env`.
+
 O Stripe Tax começa desativado para evitar cobranças incorretas. Depois de configurar endereço de origem, categoria fiscal e registros no Dashboard Stripe, altere `STRIPE_AUTOMATIC_TAX_ENABLED=true`.
 
 Rotas disponíveis:
@@ -65,4 +67,4 @@ Rotas disponíveis:
 
 Consulte [supabase/README.md](supabase/README.md) para aplicar a migration.
 
-O `.env.example` da raiz contém somente as chaves públicas exigidas pelo Vite. Chaves privadas pertencem exclusivamente ao `backend/.env`.
+O Vite lê `backend/.env` para obter as variáveis públicas `VITE_*` e só inclui essas variáveis no frontend. Chaves privadas, como `SUPABASE_SERVICE_ROLE_KEY` e `STRIPE_SECRET_KEY`, permanecem no backend e nunca devem usar o prefixo `VITE_`.

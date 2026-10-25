@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
 import { env } from '../config/env.js'
 
 export const stripe = env.stripeSecretKey
@@ -9,5 +10,6 @@ export const stripe = env.stripeSecretKey
 export const supabaseAdmin = env.supabaseConfigured
   ? createClient(env.supabaseUrl, env.serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      realtime: { transport: WebSocket },
     })
   : null

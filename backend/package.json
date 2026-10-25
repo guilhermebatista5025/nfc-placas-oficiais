@@ -4,12 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file=.env --env-file-if-exists=.env.stripe src/server.js",
-    "start": "node --env-file=.env --env-file-if-exists=.env.stripe src/server.js",
-    "check": "node --check src/server.js && node --check src/config/env.js && node --check src/config/plans.js && node --check src/lib/clients.js && node --check src/lib/http.js && node --check src/services/auth.js && node --check src/services/billing.js"
+    "dev": "node --watch --env-file=.env --env-file-if-exists=.env.stripe src/local-server.js",
+    "start": "node --env-file=.env --env-file-if-exists=.env.stripe src/local-server.js",
+    "check": "node --check src/server.js && node --check src/local-server.js && node --check src/config/env.js && node --check src/config/plans.js && node --check src/lib/clients.js && node --check src/lib/http.js && node --check src/services/auth.js && node --check src/services/billing.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.2",
-    "stripe": "^23.0.0"
+    "@supabase/supabase-js": "2.109.0",
+    "craft-nfc-manager": "file:..",
+    "stripe": "^23.0.0",
+    "ws": "^8.18.3"
   }
 }

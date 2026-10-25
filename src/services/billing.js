@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 
-const apiUrl = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:3001').replace(/\/$/, '')
+const apiUrl = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://127.0.0.1:3001')).replace(/\/$/, '')
 
 async function apiRequest(path, options = {}) {
   const { data } = await supabase.auth.getSession()
@@ -27,6 +27,13 @@ export function fetchBillingSummary() {
 
 export function startCheckout(planKey) {
   return apiRequest('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey }) })
+}
+
+export function confirmCheckoutSession(sessionId) {
+  return apiRequest('/api/billing/checkout/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId }),
+  })
 }
 
 export function openBillingPortal(planKey) {

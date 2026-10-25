@@ -13,6 +13,18 @@ function requireStripe() {
   if (!stripe) throw new HttpError(503, 'Stripe ainda não configurado no backend.', 'stripe_not_configured')
 }
 
+async function getOfficialPlanPriceId() {
+  const priceId = env.stripePrices.pro
+  if (!priceId) throw new HttpError(503, 'Configure STRIPE_PRICE_PRO com o preço mensal de R$ 19,99.', 'missing_plan_price')
+
+  const price = await stripe.prices.retrieve(priceId)
+  if (!price.active || price.currency !== 'brl' || price.unit_amount !== 1999 || price.recurring?.interval !== 'month' || price.recurring?.interval_count !== 1) {
+    throw new HttpError(503, 'O preço STRIPE_PRICE_PRO precisa estar ativo em BRL por R$ 19,99 ao mês.', 'invalid_plan_price')
+  }
+
+  return price.id
+}
+
 async function getOrganization(organizationId) {
   const { data, error } = await supabaseAdmin.from('organizations').select('*').eq('id', organizationId).single()
   if (error || !data) throw new HttpError(404, 'Organização não encontrada.', 'organization_not_found')
@@ -67,8 +79,8 @@ export async function getBillingSummary(organizationId) {
 
 export async function createCheckoutSession(organizationId, planKey, requestKey) {
   requireStripe()
-  const priceId = env.stripePrices[planKey]
-  if (!PLAN_NAMES[planKey] || !priceId) throw new HttpError(400, 'Plano inválido ou sem preço Stripe configurado.', 'invalid_plan')
+  if (planKey !== 'pro') throw new HttpError(400, 'O único plano disponível é o Craft Completo.', 'invalid_plan')
+  const priceId = await getOfficialPlanPriceId()
 
   const { organization, customerId } = await ensureOrganizationCustomer(organizationId)
   if (organization.stripe_subscription_id && ['active', 'trialing', 'past_due'].includes(organization.billing_status)) {
@@ -95,9 +107,38 @@ export async function createCheckoutSession(organizationId, planKey, requestKey)
   return { url: session.url }
 }
 
+export async function confirmCheckoutSession(organizationId, sessionId) {
+  requireStripe()
+  if (!sessionId || typeof sessionId !== 'string') {
+    throw new HttpError(400, 'Sessão de checkout inválida.', 'invalid_checkout_session')
+  }
+
+  const organization = await getOrganization(organizationId)
+  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['subscription'] })
+  if (session.mode !== 'subscription'
+    || session.client_reference_id !== organizationId
+    || session.metadata?.organization_id !== organizationId
+    || (organization.stripe_customer_id && session.customer !== organization.stripe_customer_id)) {
+    throw new HttpError(404, 'Sessão de checkout não encontrada.', 'checkout_session_not_found')
+  }
+
+  if (session.status !== 'complete' || !['paid', 'no_payment_required'].includes(session.payment_status)) {
+    return { confirmed: false }
+  }
+
+  const subscription = typeof session.subscription === 'string'
+    ? await stripe.subscriptions.retrieve(session.subscription)
+    : session.subscription
+  if (!subscription || !ACCESS_STATUSES.has(subscription.status)) return { confirmed: false }
+
+  await updateSubscription(subscription)
+  return { confirmed: true }
+}
+
 export async function createPortalSession(organizationId, targetPlanKey) {
   requireStripe()
-  if (targetPlanKey && !PLAN_NAMES[targetPlanKey]) throw new HttpError(400, 'Plano de destino inválido.', 'invalid_plan')
+  if (targetPlanKey && !['pro', 'free'].includes(targetPlanKey)) throw new HttpError(400, 'O único plano pago disponível é o Craft Completo.', 'invalid_plan')
+  const paidPriceId = targetPlanKey === 'pro' ? await getOfficialPlanPriceId() : null
 
   const { organization, customerId } = await ensureOrganizationCustomer(organizationId)
   const sessionParams = {
@@ -116,8 +157,7 @@ export async function createPortalSession(organizationId, targetPlanKey) {
         after_completion: afterCompletion,
       }
     } else {
-      const priceId = env.stripePrices[targetPlanKey]
-      if (!priceId) throw new HttpError(400, 'Preço Stripe não configurado para este plano.', 'missing_plan_price')
+      const priceId = paidPriceId
       const item = subscription.items?.data?.[0]
       if (!item) throw new HttpError(409, 'A assinatura não possui um item que possa ser alterado.', 'subscription_item_missing')
       if (item.price?.id !== priceId) {
