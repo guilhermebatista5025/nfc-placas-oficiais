@@ -80,6 +80,17 @@ export const initialProducts = [
     active: true
   },
   {
+    id: 'prod-05',
+    name: 'Placa NFC Acrílico Google Preta',
+    sku: 'NFC-PL-ACR-BLK',
+    description: 'Placa acrílica preta com chip NFC e QR Code direcionados às avaliações do Google.',
+    cost_price: 18.50,
+    sale_price: 89.90,
+    minimum_stock: 20,
+    current_stock: 0,
+    active: true
+  },
+  {
     id: 'prod-03',
     name: 'Cartão NFC de Bolso',
     sku: 'NFC-CRD-PVC',

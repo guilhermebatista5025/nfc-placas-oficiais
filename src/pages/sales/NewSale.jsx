@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronDown, CreditCard, Minus, PackageCheck, Plus, QrCode, Search, ShoppingBag, Smartphone, Trash2, UserRound } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
@@ -18,19 +18,80 @@ export function NewSale() {
   const [discount, setDiscount] = useState(0)
   const [items, setItems] = useState(products.slice(0, 2).map((product) => ({ ...product, quantity: 1 })))
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const confettiCanvas = useRef(null)
+  const animationFrame = useRef(0)
   const client = clients.find((item) => item.id === clientId)
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.sale_price * item.quantity, 0), [items])
   const total = Math.max(0, subtotal - Number(discount || 0))
   const money = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   const updateQuantity = (id, amount) => setItems((current) => current.map((item) => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + amount) } : item))
   const addProduct = () => { const next = products.find((product) => !items.some((item) => item.id === product.id)); if (next) setItems((current) => [...current, { ...next, quantity: 1 }]) }
+
+  const celebrateSale = () => {
+    const canvas = confettiCanvas.current
+    const context = canvas?.getContext('2d')
+    if (!canvas || !context) return
+
+    const bounds = canvas.getBoundingClientRect()
+    const ratio = window.devicePixelRatio || 1
+    canvas.width = Math.max(1, Math.round(bounds.width * ratio))
+    canvas.height = Math.max(1, Math.round(bounds.height * ratio))
+    context.setTransform(ratio, 0, 0, ratio, 0, 0)
+
+    const colors = ['#ffffff', '#2563eb', '#60a5fa', '#fbbf24', '#34d399', '#f472b6']
+    const papers = Array.from({ length: 90 }, () => ({
+      x: bounds.width / 2,
+      y: bounds.height - 12,
+      vx: (Math.random() - 0.5) * 10,
+      vy: Math.random() * -9 - 3,
+      rotation: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      width: 4 + Math.random() * 5,
+      height: 7 + Math.random() * 7,
+    }))
+
+    cancelAnimationFrame(animationFrame.current)
+    const draw = () => {
+      context.clearRect(0, 0, bounds.width, bounds.height)
+      let alive = 0
+      papers.forEach((paper) => {
+        paper.vy += 0.28
+        paper.vx *= 0.995
+        paper.x += paper.vx
+        paper.y += paper.vy
+        paper.rotation += paper.spin
+        if (paper.y < bounds.height + 24 && paper.x > -24 && paper.x < bounds.width + 24) alive += 1
+        context.save()
+        context.translate(paper.x, paper.y)
+        context.rotate(paper.rotation)
+        context.fillStyle = paper.color
+        context.fillRect(-paper.width / 2, -paper.height / 2, paper.width, paper.height)
+        context.restore()
+      })
+      if (alive) animationFrame.current = requestAnimationFrame(draw)
+      else {
+        animationFrame.current = 0
+        context.clearRect(0, 0, bounds.width, bounds.height)
+      }
+    }
+    animationFrame.current = requestAnimationFrame(draw)
+  }
+
+  useEffect(() => () => cancelAnimationFrame(animationFrame.current), [])
+
   const submit = async () => {
-    if (!client || !items.length) return
+    if (!client || !items.length || saving || saved) return
+    setSaving(true)
     try {
       await addSale({ client_id: client.id, client_name: client.name, items, channel, location: 'Loja Vila Velha', items_count: items.reduce((sum, item) => sum + item.quantity, 0), product_name: items[0].name, subtotal, discount: Number(discount || 0), total, cost: items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), profit: total - items.reduce((sum, item) => sum + item.cost_price * item.quantity, 0), payment_method: payment, payment_status: paid ? 'paid' : 'pending', reserve_hardware: reserve })
       setSaved(true)
-      setTimeout(() => navigate('/app'), 900)
+      setSaving(false)
+      celebrateSale()
+      setTimeout(() => navigate('/app'), 1700)
     } catch (error) {
+      setSaving(false)
       window.alert(error.message || 'Não foi possível registrar a venda.')
     }
   }
@@ -48,7 +109,7 @@ export function NewSale() {
 
       <section className="mobile-card p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-50 text-blue-600"><PackageCheck size={20} /></span><div><strong className="block text-xs">Reserva de hardware NFC</strong><p className="text-[10px] text-slate-400">Separar placas após confirmar</p></div></div><button type="button" onClick={() => setReserve((value) => !value)} className={`relative h-7 w-12 rounded-full transition ${reserve ? 'bg-blue-600' : 'bg-slate-200'}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${reserve ? 'left-6' : 'left-1'}`} /></button></div>{reserve && <div className="mt-3 flex items-center gap-2 rounded-2xl bg-blue-50 p-3 text-[10px] font-semibold text-blue-700"><Smartphone size={15} /> O estoque será reservado automaticamente.</div>}</section>
 
-      <div className="fixed inset-x-0 bottom-[74px] z-30 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur"><div className="mx-auto flex max-w-[440px] items-center gap-4"><div className="flex-1"><span className="text-[9px] font-bold uppercase text-slate-400">Total da venda</span><strong className="block text-lg text-slate-900">{money(total)}</strong></div><button type="button" onClick={submit} disabled={!items.length || saved} className="rounded-2xl bg-blue-600 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-blue-200 disabled:opacity-60">{saved ? 'Venda registrada!' : 'Confirmar venda'}</button></div></div>
+      <div className="fixed inset-x-0 bottom-[74px] z-30 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur"><div className="mx-auto flex max-w-[440px] items-center gap-4"><div className="flex-1"><span className="text-[9px] font-bold uppercase text-slate-400">Total da venda</span><strong className="block text-lg text-slate-900">{money(total)}</strong></div><div className="relative"><canvas ref={confettiCanvas} aria-hidden="true" className="pointer-events-none absolute bottom-2 left-1/2 h-44 w-[280px] max-w-[75vw] -translate-x-1/2" /><button type="button" onClick={submit} disabled={!items.length || saving || saved} aria-live="polite" className="relative z-10 min-w-[148px] rounded-2xl bg-blue-600 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-blue-200 transition disabled:cursor-not-allowed disabled:opacity-70">{saving ? <span className="inline-flex items-center gap-2"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />Efetuando venda…</span> : saved ? 'Venda registrada!' : 'Confirmar venda'}</button></div></div></div>
     </MobilePage>
   )
 }

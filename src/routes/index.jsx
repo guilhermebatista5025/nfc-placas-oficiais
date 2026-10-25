@@ -13,6 +13,7 @@ import { Sales } from '@/pages/sales/Sales'
 import { NewSale } from '@/pages/sales/NewSale'
 import { Products } from '@/pages/products/Products'
 import { Inventory } from '@/pages/inventory/Inventory'
+import { InventoryConfigure } from '@/pages/inventory/InventoryConfigure'
 import { Credentials } from '@/pages/credentials/Credentials'
 import { Reports } from '@/pages/reports/Reports'
 import { Team } from '@/pages/team/Team'
@@ -81,6 +82,7 @@ export function AppRoutes() {
         <Route path="sales/new" element={<NewSale />} />
         <Route path="products" element={<Products />} />
         <Route path="inventory" element={<Inventory />} />
+        <Route path="inventory/configure" element={<InventoryConfigure />} />
         <Route path="finance" element={<PlanGate feature="finance" title="Financeiro completo" requiredPlan="Starter"><Finance /></PlanGate>} />
         <Route path="credentials" element={<PlanGate feature="credentials" title="Cofre de credenciais" requiredPlan="Pro"><Credentials /></PlanGate>} />
         <Route path="reports" element={<PlanGate feature="reports" title="Relatórios avançados" requiredPlan="Pro"><Reports /></PlanGate>} />

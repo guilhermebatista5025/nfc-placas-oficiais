@@ -1,13 +1,34 @@
-import React, { useState } from 'react'
-import { Package, Plus, DollarSign, Layers, Tag } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Package, Plus } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
+import googlePlateImage from '@/assets/produtos/placa-google.png'
+import blackGooglePlateImage from '@/assets/produtos/placa-preta.png'
+import instagramPlateImage from '@/assets/produtos/placas-instagram.png'
+
+const productImages = {
+  'NFC-PL-ACR': googlePlateImage,
+  'NFC-PL-ACR-BLK': blackGooglePlateImage,
+  'NFC-PL-INS': instagramPlateImage,
+}
+const productNames = {
+  'NFC-PL-ACR': 'Placa Google Azul',
+  'NFC-PL-ACR-BLK': 'Placa Google Preta',
+  'NFC-PL-INS': 'Placa Instagram',
+}
 
 export function Products() {
-  const { products } = useApp()
+  const { products, loading, ensurePlateProducts } = useApp()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const ensuredCatalog = useRef(false)
+
+  useEffect(() => {
+    if (loading || ensuredCatalog.current || ['NFC-PL-ACR', 'NFC-PL-ACR-BLK', 'NFC-PL-INS'].every((sku) => products.some((product) => product.sku === sku))) return
+    ensuredCatalog.current = true
+    ensurePlateProducts().catch((error) => window.alert(error.message || 'Não foi possível carregar o catálogo de placas.'))
+  }, [ensurePlateProducts, loading, products])
 
   return (
     <div className="space-y-6">
@@ -38,6 +59,13 @@ export function Products() {
             className="bg-white rounded-card border border-cardBorder p-5 shadow-card flex flex-col justify-between"
           >
             <div>
+              {productImages[product.sku] ? (
+                <div className="relative mb-4 flex h-44 items-center justify-center overflow-hidden rounded-2xl bg-slate-50 p-3">
+                  <img src={productImages[product.sku]} alt={product.name} className="h-full w-full object-contain" />
+                </div>
+              ) : (
+                <div className="mb-4 grid h-36 place-items-center rounded-2xl bg-slate-50 text-primary"><Package size={38} /></div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono font-bold bg-primary/10 text-primary px-2 py-0.5 rounded">
                   {product.sku}
@@ -52,7 +80,7 @@ export function Products() {
               </div>
 
               <h3 className="text-sm font-bold text-mainText mt-3 font-heading">
-                {product.name}
+                {productNames[product.sku] || product.name}
               </h3>
               <p className="text-xs text-subText mt-1 line-clamp-2">
                 {product.description}
@@ -63,13 +91,13 @@ export function Products() {
               <div>
                 <span className="text-[10px] text-subText block">Preço de Venda</span>
                 <span className="text-base font-bold font-heading text-mainText">
-                  R$ {product.sale_price.toFixed(2)}
+                  R$ {Number(product.sale_price || 0).toFixed(2)}
                 </span>
               </div>
               <div className="text-right">
                 <span className="text-[10px] text-subText block">Custo Unitário</span>
                 <span className="text-xs font-semibold text-subText font-mono">
-                  R$ {product.cost_price.toFixed(2)}
+                  R$ {Number(product.cost_price || 0).toFixed(2)}
                 </span>
               </div>
             </div>

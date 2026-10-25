@@ -6,14 +6,14 @@ export function MobilePage({ children, className = '' }) {
   return <div className={`mobile-page ${className}`}>{children}</div>
 }
 
-export function MobileHeader({ title, subtitle, back = false, actions, compact = false, onNotifications }) {
+export function MobileHeader({ title, subtitle, back = false, actions, compact = false, onNotifications, onBack }) {
   const navigate = useNavigate()
 
   return (
     <header className={`mobile-header ${compact ? 'mobile-header--compact' : ''}`}>
       <div className="flex items-center gap-3 min-w-0">
         {back ? (
-          <button className="mobile-icon-button" type="button" onClick={() => navigate(-1)} aria-label="Voltar">
+          <button className="mobile-icon-button" type="button" onClick={onBack || (() => navigate(-1))} aria-label="Voltar">
             <ArrowLeft size={20} />
           </button>
         ) : (

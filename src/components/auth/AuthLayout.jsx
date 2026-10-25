@@ -4,10 +4,8 @@ import background from '@/assets/fundo-login.png'
 
 export function AuthLayout({ title, subtitle, children, footer }) {
   return (
-    <main
-      className="auth-shell"
-      style={{ '--auth-background': `url(${background})` }}
-    >
+    <main className="auth-shell">
+      <img className="auth-background" src={background} alt="" aria-hidden="true" />
       <section className="auth-panel">
         <div className="auth-logo-card">
           <img src={logo} alt="Craft Evolution Digital Architects" />

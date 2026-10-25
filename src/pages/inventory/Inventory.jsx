@@ -1,133 +1,86 @@
-import React, { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Archive, Box, Check, CircleDollarSign, Nfc as Contactless, Minus, PackagePlus, Plus, Save, Settings2, Sparkles, X } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Archive, ArrowRight, Clock3, Minus, Plus } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
 import { MobileHeader, MobilePage } from '@/components/mobile/MobileUI'
+import { InventoryMovementsSheet } from '@/components/mobile/InventoryMovementsSheet'
 import googlePlateImage from '@/assets/produtos/placa-google.png'
+import blackGooglePlateImage from '@/assets/produtos/placa-preta.png'
 import instagramPlateImage from '@/assets/produtos/placas-instagram.png'
 
 const presets = [10, 25, 50, 100, 250]
-const productImages = { 'NFC-PL-ACR': googlePlateImage, 'NFC-PL-INS': instagramPlateImage }
+const plateSkus = ['NFC-PL-ACR', 'NFC-PL-ACR-BLK', 'NFC-PL-INS']
+const productImages = { 'NFC-PL-ACR': googlePlateImage, 'NFC-PL-ACR-BLK': blackGooglePlateImage, 'NFC-PL-INS': instagramPlateImage }
+const productLabels = { 'NFC-PL-ACR': 'Placa Google Azul', 'NFC-PL-ACR-BLK': 'Placa Google Preta', 'NFC-PL-INS': 'Placa Instagram' }
 
 export function Inventory() {
   const navigate = useNavigate()
-  const carouselRef = useRef(null)
-  const { products, updateProductPricing, addPlateBatch } = useApp()
-  const plateProducts = products.filter((item) => item.sku === 'NFC-PL-ACR' || item.sku === 'NFC-PL-INS')
-  const [productId, setProductId] = useState(plateProducts[0]?.id || '')
-  const [quantity, setQuantity] = useState(10)
-  const [cost, setCost] = useState(products[0]?.cost_price || 0)
-  const [salePrice, setSalePrice] = useState(products[0]?.sale_price || 0)
-  const [minimumStock, setMinimumStock] = useState(products[0]?.minimum_stock || 0)
-  const [saved, setSaved] = useState(false)
-  const [activeSlide, setActiveSlide] = useState(0)
-  const [pricingOpen, setPricingOpen] = useState(false)
-  const [pricingSaved, setPricingSaved] = useState(false)
-  const [pricingDraft, setPricingDraft] = useState({ cost_price: '', sale_price: '', minimum_stock: '' })
-  const product = plateProducts.find((item) => item.id === productId) || plateProducts[0]
+  const location = useLocation()
+  const { products, loading, ensurePlateProducts } = useApp()
+  const plateProducts = useMemo(() => plateSkus.map((sku) => products.find((item) => item.sku === sku)).filter(Boolean), [products])
+  const [quantities, setQuantities] = useState(() => location.state?.quantities || { 'NFC-PL-ACR': 0, 'NFC-PL-ACR-BLK': 0, 'NFC-PL-INS': 0 })
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+  const [ensuringCatalog, setEnsuringCatalog] = useState(false)
+  const catalogAttempted = useRef(false)
+
+  useEffect(() => {
+    if (loading || plateProducts.length === plateSkus.length || catalogAttempted.current) return
+    catalogAttempted.current = true
+    let active = true
+    setEnsuringCatalog(true)
+    ensurePlateProducts().catch((error) => {
+      if (active) setCatalogError(error.message || 'Não foi possível carregar as placas.')
+    }).finally(() => {
+      if (active) setEnsuringCatalog(false)
+    })
+    return () => { active = false }
+  }, [loading, plateProducts.length, ensurePlateProducts])
+
+  const totalQuantity = plateProducts.reduce((sum, item) => sum + Number(quantities[item.sku] || 0), 0)
   const totalUnits = plateProducts.reduce((sum, item) => sum + Number(item.current_stock || 0), 0)
-  const totalCost = Number(cost || 0) * quantity
-  const grossResult = Number(salePrice || 0) * quantity
-  const netResult = grossResult - totalCost
-  const margin = grossResult > 0 ? (netResult / grossResult) * 100 : 0
-  const money = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const chooseProduct = (id) => { const next = plateProducts.find((item) => item.id === id); setProductId(id); if (next) { setCost(next.cost_price); setSalePrice(next.sale_price); setMinimumStock(next.minimum_stock) } }
-  const openPricing = () => {
-    setPricingSaved(false)
-    setPricingDraft({ cost_price: cost, sale_price: salePrice, minimum_stock: minimumStock })
-    setPricingOpen(true)
+
+  const changeQuantity = (sku, next) => {
+    setQuantities((current) => ({ ...current, [sku]: Math.max(0, Math.floor(Number(next) || 0)) }))
   }
-  const savePricing = async (event) => {
-    event.preventDefault()
-    const nextCost = Number(pricingDraft.cost_price || 0)
-    const nextSalePrice = Number(pricingDraft.sale_price || 0)
-    const nextMinimumStock = Number(pricingDraft.minimum_stock || 0)
-    setCost(nextCost)
-    setSalePrice(nextSalePrice)
-    setMinimumStock(nextMinimumStock)
-    try {
-      await updateProductPricing(product.id, { cost_price: nextCost, sale_price: nextSalePrice, minimum_stock: nextMinimumStock })
-      setPricingSaved(true)
-      setTimeout(() => setPricingOpen(false), 650)
-    } catch (error) {
-      window.alert(error.message || 'Não foi possível salvar os preços.')
-    }
-  }
-  const goToSlide = (index) => {
-    carouselRef.current?.scrollTo({ left: carouselRef.current.clientWidth * index, behavior: 'smooth' })
-    setActiveSlide(index)
-  }
-  const submit = async () => {
-    if (!product || quantity < 1) return
-    try {
-      await addPlateBatch({ product, quantity, serialPrefix: product.sku === 'NFC-PL-ACR' ? 'GOOGLE' : 'INSTAGRAM', costPrice: cost, salePrice, minimumStock })
-      setSaved(true)
-      setTimeout(() => navigate('/app/plates'), 1100)
-    } catch (error) {
-      window.alert(error.message || 'Não foi possível cadastrar o lote.')
-    }
+
+  const goToConfiguration = () => {
+    if (!totalQuantity) return
+    navigate('/app/inventory/configure', { state: { quantities } })
   }
 
   return (
     <MobilePage className="pb-36">
-      <MobileHeader title="Cadastrar placas" subtitle="Entrada no estoque" back compact />
-      <section className="relative mt-2 overflow-hidden rounded-[28px] bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 p-5 text-white"><div className="absolute -right-10 -bottom-12 h-40 w-40 rounded-full bg-sky-400/20 blur-2xl" /><div className="relative"><div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Estoque central</p><strong className="mt-1 block text-3xl text-white">{totalUnits}</strong><span className="text-[10px] text-blue-200">unidades disponíveis</span></div><span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/20"><Archive size={26} /></span></div><div className="mt-5"><div className="mb-2 flex justify-between text-[9px] font-bold text-blue-200"><span>Capacidade utilizada</span><span>64%</span></div><div className="h-2 rounded-full bg-white/10"><div className="h-2 w-[64%] rounded-full bg-gradient-to-r from-sky-300 to-emerald-300" /></div></div></div></section>
+      <MobileHeader title="Estoque" subtitle="Entrada de placas" back compact actions={(
+        <button type="button" onClick={() => setHistoryOpen(true)} className="flex h-10 items-center gap-2 rounded-full border border-slate-100 bg-white px-3 text-[10px] font-bold text-slate-600 shadow-sm"><Clock3 size={15} /> Histórico</button>
+      )} />
 
-      <section className="mt-5">
-        <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-extrabold">Tipo de placa</h2><p className="text-[10px] text-slate-400">Escolha Google ou Instagram</p></div><PackagePlus size={20} className="text-blue-600" /></div>
-        <div className="grid grid-cols-2 gap-3">
-          {plateProducts.map((item) => (
-            <button key={item.id} type="button" onClick={() => chooseProduct(item.id)} className={`relative overflow-hidden rounded-3xl p-2 text-left ring-2 transition ${productId === item.id ? 'bg-white ring-blue-600 shadow-lg shadow-blue-100' : 'bg-white ring-transparent shadow-sm'}`}>
-              {productId === item.id && <span className="absolute right-3 top-3 z-10 grid h-6 w-6 place-items-center rounded-full bg-blue-600 text-white shadow"><Check size={13} /></span>}
-              <div className="aspect-square overflow-hidden rounded-2xl bg-slate-50"><img src={productImages[item.sku]} alt={item.name} className="h-full w-full object-contain" /></div>
-              <div className="px-1 pb-1 pt-2"><strong className="block text-[11px] leading-tight text-slate-900">{item.sku === 'NFC-PL-ACR' ? 'Placa Google' : 'Placa Instagram'}</strong><div className="mt-1 flex items-center justify-between"><span className="text-[9px] text-slate-400">{item.current_stock} em estoque</span><Contactless size={14} className={item.sku === 'NFC-PL-ACR' ? 'text-blue-600' : 'text-pink-500'} /></div></div>
-            </button>
-          ))}
-        </div>
+      <section className="mt-3 flex items-center justify-between rounded-3xl bg-slate-900 p-4 text-white shadow-lg shadow-slate-200">
+        <div><p className="text-[9px] font-bold uppercase tracking-[.16em] text-slate-400">Saldo atual</p><div className="mt-1 flex items-baseline gap-2"><strong className="text-3xl font-black">{totalUnits}</strong><span className="text-[11px] font-semibold text-slate-300">placas em estoque</span></div></div>
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-blue-300"><Archive size={23} /></span>
       </section>
 
-      <div
-        ref={carouselRef}
-        onScroll={(event) => setActiveSlide(Math.round(event.currentTarget.scrollLeft / event.currentTarget.clientWidth))}
-        className="mobile-carousel -mx-1 mt-4 flex snap-x snap-mandatory overflow-x-auto px-1 pb-2"
-      >
-      <section className="mobile-card min-w-full snap-center p-4">
-        <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><Box size={17} /></span><div><h2 className="text-sm font-extrabold">Quantidade e valores</h2><p className="text-[9px] text-slate-400">Compra, venda e estoque mínimo</p></div></div><button type="button" onClick={openPricing} className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-[9px] font-extrabold text-white shadow-md shadow-blue-100"><Settings2 size={13} />{product?.pricing_configured ? 'Editar valores' : 'Definir valores'}</button></div>
-        <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 p-2"><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))} className="grid h-11 w-11 place-items-center rounded-xl bg-white shadow-sm"><Minus size={17} /></button><div className="text-center"><strong className="block text-2xl">{quantity}</strong><span className="text-[9px] font-bold text-slate-400">UNIDADES DO LOTE</span></div><button type="button" onClick={() => setQuantity((value) => value + 1)} className="grid h-11 w-11 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-200"><Plus size={17} /></button></div>
-        <div className="mt-3 flex gap-2 overflow-x-auto">{presets.map((item) => <button key={item} type="button" onClick={() => setQuantity(item)} className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-extrabold ${quantity === item ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>+{item}</button>)}</div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <div className="rounded-2xl bg-rose-50 p-3"><span className="text-[8px] font-bold uppercase text-rose-500">Fornecedor</span><strong className="mt-1 block text-xs text-slate-900">{money(Number(cost || 0))}</strong><small className="text-[8px] text-rose-400">por unidade</small></div>
-          <div className="rounded-2xl bg-emerald-50 p-3"><span className="text-[8px] font-bold uppercase text-emerald-600">Venda</span><strong className="mt-1 block text-xs text-slate-900">{money(Number(salePrice || 0))}</strong><small className="text-[8px] text-emerald-500">por unidade</small></div>
-          <div className="rounded-2xl bg-amber-50 p-3"><span className="text-[8px] font-bold uppercase text-amber-600">Mínimo</span><strong className="mt-1 block text-xs text-slate-900">{minimumStock}</strong><small className="text-[8px] text-amber-500">unidades</small></div>
-        </div>
+      <section className="mt-6">
+        <div className="mb-3 flex items-end justify-between"><div><p className="text-[9px] font-extrabold uppercase tracking-[.16em] text-blue-600">Etapa 1</p><h2 className="mt-1 text-base font-extrabold text-slate-900">O que chegou do fornecedor?</h2></div><span className="text-[10px] font-semibold text-slate-400">{plateProducts.length}/{plateSkus.length} tipos</span></div>
+        {loading || ensuringCatalog ? <div className="rounded-2xl border border-slate-100 bg-white p-5 text-center text-xs font-semibold text-slate-400">Carregando placas…</div> : plateProducts.length ? (
+          <div className="space-y-3">
+            {plateProducts.map((product) => {
+              const quantity = Number(quantities[product.sku] || 0)
+              return <article key={product.id} className={`rounded-3xl border bg-white p-4 shadow-sm ${quantity ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-100'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="grid h-[76px] w-[88px] shrink-0 place-items-center rounded-2xl bg-slate-50"><img src={productImages[product.sku]} alt={productLabels[product.sku]} className="h-full w-full object-contain" /></div>
+                  <div className="min-w-0 flex-1"><strong className="block truncate text-sm font-extrabold text-slate-900">{productLabels[product.sku]}</strong><p className="mt-1 text-[10px] text-slate-400">{Number(product.current_stock || 0)} em estoque</p></div>
+                  <div className="flex shrink-0 items-center gap-2"><button type="button" aria-label={`Diminuir ${productLabels[product.sku]}`} onClick={() => changeQuantity(product.sku, quantity - 1)} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600"><Minus size={15} /></button><input aria-label={`Quantidade de ${productLabels[product.sku]}`} type="number" min="0" step="1" value={quantity} onChange={(event) => changeQuantity(product.sku, event.target.value)} className="w-12 rounded-lg bg-transparent text-center text-base font-black text-slate-900 outline-none" /><button type="button" aria-label={`Aumentar ${productLabels[product.sku]}`} onClick={() => changeQuantity(product.sku, quantity + 1)} className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-200"><Plus size={15} /></button></div>
+                </div>
+                <div className="mt-3 flex gap-2 overflow-x-auto border-t border-slate-100 pt-3">{presets.map((preset) => <button key={preset} type="button" onClick={() => changeQuantity(product.sku, preset)} className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-extrabold ${quantity === preset ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>{preset} un.</button>)}</div>
+              </article>
+            })}
+          </div>
+        ) : <div className="rounded-2xl border border-dashed border-rose-200 bg-white p-5 text-center text-xs text-rose-600">{catalogError || 'Não foi possível disponibilizar as placas para entrada.'}</div>}
       </section>
 
-      <section className="mobile-card min-w-full snap-center overflow-hidden p-4">
-        <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-extrabold">Resultado estimado do lote</h2><p className="text-[9px] text-slate-400">Considerando a venda das {quantity} unidades</p></div><span className={`rounded-full px-2.5 py-1 text-[9px] font-extrabold ${netResult >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{margin.toFixed(1)}% margem</span></div>
-        <div className="grid grid-cols-2 gap-3"><div className="rounded-2xl bg-blue-50 p-3"><span className="text-[9px] font-bold uppercase text-blue-500">Resultado bruto</span><strong className="mt-1 block text-base text-blue-800">{money(grossResult)}</strong><small className="text-[8px] text-blue-400">vendas sem descontar custos</small></div><div className={`rounded-2xl p-3 ${netResult >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}><span className={`text-[9px] font-bold uppercase ${netResult >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>Resultado líquido</span><strong className={`mt-1 block text-base ${netResult >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>{money(netResult)}</strong><small className={netResult >= 0 ? 'text-emerald-500' : 'text-rose-500'}>bruto menos fornecedor</small></div></div>
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-slate-900 p-3 text-white"><span className="text-[10px] font-semibold text-slate-300">Investimento no fornecedor</span><strong className="text-sm text-white">{money(totalCost)}</strong></div>
-      </section>
-      </div>
-      <div className="mt-1 flex items-center justify-center gap-2">
-        {[0, 1].map((index) => <button key={index} type="button" aria-label={`Ir para página ${index + 1}`} onClick={() => goToSlide(index)} className={`h-1.5 rounded-full transition-all ${activeSlide === index ? 'w-6 bg-blue-600' : 'w-1.5 bg-slate-300'}`} />)}
-      </div>
-      <p className="mt-2 text-center text-[9px] font-semibold text-slate-400">{activeSlide === 0 ? 'Arraste para a esquerda para ver o resultado →' : '← Arraste para voltar aos valores'}</p>
-
-      {pricingOpen && (
-        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/55 p-3 backdrop-blur-sm" onClick={() => setPricingOpen(false)}>
-          <form onSubmit={savePricing} className="mx-auto w-full max-w-md rounded-[28px] bg-white p-5" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between"><div><h2 className="text-base font-extrabold">{product?.pricing_configured ? 'Editar valores' : 'Configurar valores'}</h2><p className="mt-0.5 text-[10px] text-slate-400">{product?.sku === 'NFC-PL-ACR' ? 'Placa Google' : 'Placa Instagram'} • os dados ficarão salvos</p></div><button type="button" onClick={() => setPricingOpen(false)} className="mobile-icon-button"><X size={18} /></button></div>
-            <div className="mt-5 space-y-3">
-              <label className="block rounded-2xl bg-rose-50 p-3"><span className="flex items-center gap-1 text-[9px] font-extrabold uppercase text-rose-500"><CircleDollarSign size={13} /> Valor pago ao fornecedor</span><div className="mt-2 flex items-center rounded-xl bg-white px-3 ring-1 ring-rose-100"><span className="text-xs font-bold text-slate-400">R$</span><input required autoFocus type="number" min="0" step="0.01" value={pricingDraft.cost_price} onChange={(event) => setPricingDraft((current) => ({ ...current, cost_price: event.target.value }))} className="min-w-0 flex-1 bg-transparent p-3 text-sm font-extrabold outline-none" /></div><small className="mt-1 block text-[8px] text-rose-400">Custo de compra de uma placa</small></label>
-              <label className="block rounded-2xl bg-emerald-50 p-3"><span className="flex items-center gap-1 text-[9px] font-extrabold uppercase text-emerald-600"><CircleDollarSign size={13} /> Preço de venda</span><div className="mt-2 flex items-center rounded-xl bg-white px-3 ring-1 ring-emerald-100"><span className="text-xs font-bold text-slate-400">R$</span><input required type="number" min="0" step="0.01" value={pricingDraft.sale_price} onChange={(event) => setPricingDraft((current) => ({ ...current, sale_price: event.target.value }))} className="min-w-0 flex-1 bg-transparent p-3 text-sm font-extrabold outline-none" /></div><small className="mt-1 block text-[8px] text-emerald-500">Valor cobrado por uma placa</small></label>
-              <label className="block rounded-2xl bg-amber-50 p-3"><span className="text-[9px] font-extrabold uppercase text-amber-700">Quantidade mínima em estoque</span><input required type="number" min="0" step="1" value={pricingDraft.minimum_stock} onChange={(event) => setPricingDraft((current) => ({ ...current, minimum_stock: event.target.value }))} className="mt-2 w-full rounded-xl bg-white p-3 text-sm font-extrabold outline-none ring-1 ring-amber-100" /><small className="mt-1 block text-[8px] text-amber-600">Limite para gerar o alerta de reposição</small></label>
-            </div>
-            <button type="submit" className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-blue-200">{pricingSaved ? <><Check size={16} /> Valores salvos!</> : <><Save size={16} /> Salvar valores</>}</button>
-          </form>
-        </div>
-      )}
-
-      <div className="fixed inset-x-0 bottom-[74px] z-30 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur"><div className="mx-auto flex max-w-[440px] items-center gap-4"><div className="flex-1"><span className="text-[9px] font-bold uppercase text-slate-400">Nova entrada</span><strong className="block text-sm">{quantity} placas • {money(totalCost)}</strong></div><button type="button" onClick={submit} disabled={saved} className="flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-blue-200 disabled:opacity-60">{saved ? <><Check size={16} /> Cadastrado!</> : <><Sparkles size={16} /> Confirmar lote</>}</button></div></div>
+      <div className="fixed inset-x-0 bottom-[74px] z-30 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur"><div className="mx-auto flex max-w-[440px] items-center gap-4"><div className="min-w-0 flex-1"><span className="text-[9px] font-bold uppercase text-slate-400">Total da entrada</span><strong className="block truncate text-sm text-slate-900">{totalQuantity} placas</strong></div><button type="button" onClick={goToConfiguration} disabled={!totalQuantity || loading || ensuringCatalog} className="flex shrink-0 items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-xs font-extrabold text-white shadow-lg shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60">Configurar valores <ArrowRight size={15} /></button></div></div>
+      <InventoryMovementsSheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </MobilePage>
   )
 }

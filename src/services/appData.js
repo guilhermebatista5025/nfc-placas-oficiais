@@ -54,6 +54,18 @@ export async function patchProduct(id, changes) {
   return unwrap(await supabase.from('products').update(changes).eq('id', id).select().single())
 }
 
+export async function ensurePlateProducts(organizationId) {
+  const catalog = [
+    { organization_id: organizationId, name: 'Placa NFC Acrílico Google Azul', sku: 'NFC-PL-ACR', description: 'Placa acrílica azul personalizada com chip NFC e QR Code para avaliações no Google.', minimum_stock: 20, current_stock: 0, cost_price: 0, sale_price: 0, pricing_configured: false, active: true },
+    { organization_id: organizationId, name: 'Placa NFC Acrílico Google Preta', sku: 'NFC-PL-ACR-BLK', description: 'Placa acrílica preta personalizada com chip NFC e QR Code para avaliações no Google.', minimum_stock: 20, current_stock: 0, cost_price: 0, sale_price: 0, pricing_configured: false, active: true },
+    { organization_id: organizationId, name: 'Placa NFC Acrílico Instagram', sku: 'NFC-PL-INS', description: 'Placa acrílica com chip NFC e QR Code direcionados ao perfil do Instagram.', minimum_stock: 10, current_stock: 0, cost_price: 0, sale_price: 0, pricing_configured: false, active: true },
+  ]
+
+  const saved = await supabase.from('products').upsert(catalog, { onConflict: 'organization_id,sku', ignoreDuplicates: true })
+  if (saved.error) throw saved.error
+  return unwrap(await supabase.from('products').select('*').eq('active', true).in('sku', catalog.map((item) => item.sku)).order('created_at'))
+}
+
 export async function patchPlate(id, changes) {
   return unwrap(await supabase.from('plates').update(changes).eq('id', id).select('*, product:products(name), client:clients(name)').single())
 }

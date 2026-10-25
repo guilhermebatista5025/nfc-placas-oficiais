@@ -48,6 +48,8 @@
 .pricing-carousel { position: relative; z-index: 1; display: flex; gap: 14px; margin-top: 30px; padding: 14px 20px 22px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; }
 .pricing-card { position: relative; display: flex; width: min(82vw, 350px); min-width: min(82vw, 350px); min-height: 475px; flex-direction: column; scroll-snap-align: center; padding: 27px 24px 22px; overflow: hidden; border: 1px solid rgba(255,255,255,.94); border-radius: 30px; background: rgba(246,250,255,.72); box-shadow: 12px 16px 35px rgba(66,105,170,.16), inset 2px 2px 7px #fff, inset -3px -4px 10px rgba(114,154,215,.08); backdrop-filter: blur(18px); }
 .pricing-card--popular { border-color: #5a8eff; box-shadow: 14px 19px 40px rgba(45,100,220,.24), inset 2px 2px 7px #fff; }
+.pricing-carousel--single { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; overflow: visible; }
+.pricing-carousel--single .pricing-card { width: min(100%, 370px); min-width: 0; }
 .pricing-ribbon { position: absolute; top: 25px; right: -41px; width: 160px; padding: 7px 0; transform: rotate(45deg); color: white; background: linear-gradient(100deg,#6b52ed,#398cff); box-shadow: 0 8px 20px rgba(74,91,238,.27); font-size: 10px; font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: .04em; }
 .pricing-plan-icon { display: grid; width: 58px; height: 58px; place-items: center; border: 1px solid rgba(255,255,255,.86); border-radius: 20px; color: #4169ed; background: rgba(211,226,255,.64); box-shadow: inset 2px 2px 6px #fff, 7px 9px 18px rgba(75,119,201,.13); }
 .pricing-card h2 { margin-top: 21px; color: #07133f; font-size: 27px; font-weight: 850; letter-spacing: -.035em; }
@@ -74,6 +76,11 @@
 .pricing-account-card > button { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 14px; color: #3168df; background: #edf4ff; }
 .pricing-spinner { width: 16px; height: 16px; border: 2px solid #bcd2ff; border-top-color: #3168df; border-radius: 50%; animation: pricing-spin .7s linear infinite; }
 .pricing-security { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 7px; margin: 14px 20px 0; color: #7187ad; font-size: 9px; font-weight: 700; }
+.pricing-cancel { position: relative; z-index: 1; display: block; width: fit-content; margin: 12px auto 0; padding: 11px 18px; border: 1px solid rgba(190, 72, 87, .24); border-radius: 999px; color: #9f3d4d; background: rgba(255,248,248,.9); box-shadow: 0 5px 14px rgba(111,48,63,.08), inset 1px 1px 3px #fff; font-size: 12px; font-weight: 750; cursor: pointer; transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.pricing-cancel:hover:not(:disabled) { border-color: rgba(190, 72, 87, .42); background: #fff0f1; box-shadow: 0 7px 18px rgba(111,48,63,.12), inset 1px 1px 3px #fff; transform: translateY(-1px); }
+.pricing-cancel:active:not(:disabled) { transform: translateY(0); }
+.pricing-cancel:focus-visible { outline: 3px solid rgba(190,72,87,.28); outline-offset: 3px; }
+.pricing-cancel:disabled { cursor: wait; opacity: .6; }
 .pricing-invoices { position: relative; z-index: 1; margin: 26px 20px 0; padding: 19px; border: 1px solid rgba(255,255,255,.9); border-radius: 26px; background: rgba(255,255,255,.7); box-shadow: 8px 11px 25px rgba(62,103,168,.1); backdrop-filter: blur(16px); }
 .pricing-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .pricing-section-heading h2 { display: flex; align-items: center; gap: 7px; color: #0b1743; font-size: 13px; font-weight: 800; }
@@ -131,6 +138,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   --auth-ink: #071838;
   --auth-muted: #607091;
   --auth-blue: #075dea;
+  color-scheme: only light;
   position: relative;
   display: grid;
   min-height: 100dvh;
@@ -138,12 +146,10 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   overflow-x: hidden;
   padding: max(42px, env(safe-area-inset-top)) 22px max(30px, env(safe-area-inset-bottom));
   background-color: #eaf2ff;
-  background-image: linear-gradient(rgb(242 247 255 / .14), rgb(242 247 255 / .14)), var(--auth-background);
-  background-position: center top;
-  background-size: cover;
   color: var(--auth-ink);
 }
-.auth-panel { width: min(100%, 470px); margin: auto; padding: 16px 0 4px; }
+.auth-background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; pointer-events: none; }
+.auth-panel { position: relative; z-index: 1; width: min(100%, 470px); margin: auto; padding: 16px 0 4px; }
 .auth-logo-card {
   display: grid;
   width: min(72vw, 260px);
@@ -175,7 +181,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   height: 72px;
   align-items: center;
   border: 1px solid rgb(255 255 255 / .88);
-  border-radius: 25px;
+  border-radius: 29px;
   background: rgb(236 243 255 / .72);
   box-shadow: 11px 15px 26px rgb(71 111 181 / .17), inset 3px 3px 8px rgb(255 255 255 / .95), inset -4px -5px 10px rgb(112 155 221 / .1);
   backdrop-filter: blur(15px);
@@ -220,7 +226,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .auth-panel:has(.auth-form--register) .auth-logo-card { width: min(64vw, 225px); min-height: 82px; margin-bottom: 20px; padding: 13px 18px; border-radius: 29px; }
 .auth-panel:has(.auth-form--register) .auth-heading { margin-bottom: 20px; }
 .auth-panel:has(.auth-form--register) .auth-heading h1 { font-size: clamp(29px, 7.8vw, 38px); }
-.auth-panel:has(.auth-form--register) .auth-field { height: 62px; border-radius: 22px; }
+.auth-panel:has(.auth-form--register) .auth-field { height: 62px; border-radius: 25px; }
 .auth-panel:has(.auth-form--register) .auth-submit { height: 64px; border-radius: 24px; font-size: 19px; }
 .auth-panel:has(.auth-form--register) .auth-submit__arrow { width: 43px; height: 43px; border-radius: 15px; }
 .auth-panel:has(.auth-form--register) .auth-switch { margin-top: 16px; }

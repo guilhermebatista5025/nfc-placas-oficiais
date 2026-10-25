@@ -86,6 +86,14 @@ export function AppProvider({ children }) {
     return product
   }
 
+  const ensurePlateProducts = useCallback(async () => {
+    requireBackend(isSupabaseConfigured)
+    if (!organizationId) throw new Error('Não foi possível identificar sua organização.')
+    const plateProducts = await api.ensurePlateProducts(organizationId)
+    setData((current) => ({ ...current, products: [...current.products.filter((item) => !['NFC-PL-ACR', 'NFC-PL-ACR-BLK', 'NFC-PL-INS'].includes(item.sku)), ...plateProducts] }))
+    return plateProducts
+  }, [isSupabaseConfigured, organizationId])
+
   const updatePlate = async (id, changes) => {
     const currentPlate = data.plates.find((item) => item.id === id)
     const activatedAt = changes.status === 'active' && currentPlate?.status !== 'active' ? new Date().toISOString() : undefined
@@ -110,6 +118,34 @@ export function AppProvider({ children }) {
     })
     await reload()
     return created
+  }
+
+  const addPlateBatches = async (batches) => {
+    requireBackend(isSupabaseConfigured)
+    const totalQuantity = batches.reduce((total, batch) => total + Number(batch.quantity), 0)
+    assertWithinLimit('placas', data.plates.length, totalQuantity, entitlements.limits.plates)
+    let completed = 0
+    try {
+      for (const batch of batches) {
+        await api.createPlateBatch({
+          productId: batch.product.id,
+          quantity: batch.quantity,
+          serialPrefix: batch.product.sku === 'NFC-PL-INS' ? 'INSTAGRAM' : batch.product.sku === 'NFC-PL-ACR-BLK' ? 'GOOGLE-PRETA' : 'GOOGLE-AZUL',
+          costPrice: Number(batch.product.cost_price),
+          salePrice: Number(batch.product.sale_price),
+          minimumStock: Number(batch.product.minimum_stock),
+        })
+        completed += 1
+      }
+    } catch (batchError) {
+      if (completed) {
+        throw new Error(`Parte da entrada foi registrada (${completed} de ${batches.length} tipos). Atualizei o estoque; confira antes de tentar novamente. ${batchError.message}`)
+      }
+      throw batchError
+    } finally {
+      if (completed) await reload()
+    }
+    return completed
   }
 
   const addSale = async (saleData) => {
@@ -144,8 +180,10 @@ export function AppProvider({ children }) {
     addClient,
     updateClient,
     updateProductPricing,
+    ensurePlateProducts,
     updatePlate,
     addPlateBatch,
+    addPlateBatches,
     addSale,
     addInventoryMovement,
     entitlements,
