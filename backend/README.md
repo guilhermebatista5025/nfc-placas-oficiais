@@ -58,6 +58,7 @@ O Stripe Tax começa desativado para evitar cobranças incorretas. Depois de con
 Rotas disponíveis:
 
 - `GET /api/billing/summary`
+- `GET /api/plates/redirect/:id` (link dinâmico público da placa)
 - `POST /api/billing/checkout`
 - `POST /api/billing/portal`
 - `POST /api/billing/cancel`

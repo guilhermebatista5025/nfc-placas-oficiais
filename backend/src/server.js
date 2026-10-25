@@ -1,6 +1,7 @@
 import { env } from './config/env.js'
 import { HttpError, readBody, readJson, sendJson } from './lib/http.js'
 import { requireAuth } from './services/auth.js'
+import { getPlateRedirectDestination } from './services/plates.js'
 import {
   createCheckoutSession,
   confirmCheckoutSession,
@@ -33,6 +34,19 @@ export async function handleRequest(request, response) {
   }
 
   try {
+    const plateRedirect = url.pathname.match(/^\/api\/plates\/redirect\/([^/]+)$/)
+    if (request.method === 'GET' && plateRedirect) {
+      const destination = await getPlateRedirectDestination(decodeURIComponent(plateRedirect[1]))
+      if (!destination) return sendJson(response, 404, { error: 'Esta placa ainda não tem um destino ativo.', code: 'plate_destination_not_found' }, origin)
+      response.writeHead(302, {
+        Location: destination,
+        'Cache-Control': 'no-store',
+        'Referrer-Policy': 'no-referrer',
+        'X-Content-Type-Options': 'nosniff',
+      })
+      return response.end()
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/stripe/webhook') {
       const rawBody = await readBody(request)
       const result = await processWebhook(rawBody, request.headers['stripe-signature'] || '')
